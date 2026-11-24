@@ -74,10 +74,22 @@ alter table orders enable row level security;
 alter table products enable row level security;
 alter table categories enable row level security;
 
+alter table cart_items enable row level security;
+alter table order_items enable row level security;
+
 create policy profiles_own on profiles for select using (auth.uid() = id);
-create policy profiles_update_own on profiles for update using (auth.uid() = id);
+create policy profiles_update_own on profiles for update
+  using (auth.uid() = id)
+  with check (auth.uid() = id and role = 'CLIENTE');
+revoke update on profiles from anon, authenticated;
 create policy carts_own on carts for select using (auth.uid() = user_id);
 create policy orders_own on orders for select using (auth.uid() = user_id);
+create policy cart_items_own on cart_items for all
+  using (exists (select 1 from carts c where c.id = cart_id and c.user_id = auth.uid()))
+  with check (exists (select 1 from carts c where c.id = cart_id and c.user_id = auth.uid()));
+create policy order_items_own on order_items for all
+  using (exists (select 1 from orders o where o.id = order_id and o.user_id = auth.uid()))
+  with check (exists (select 1 from orders o where o.id = order_id and o.user_id = auth.uid()));
 create policy products_public on products for select using (active = true);
 create policy categories_public on categories for select using (active = true);
 
@@ -87,7 +99,33 @@ create or replace function create_order_from_cart(
 ) returns uuid language plpgsql security definer set search_path = public as $$
 declare
   v_code text; v_order_id uuid; v_total numeric(10,2); v_bad integer;
+  v_now timestamptz := now(); v_local date; v_closing timestamptz;
 begin
+  if nullif(btrim(coalesce(p_customer_name, '')), '') is null
+     or nullif(btrim(coalesce(p_customer_phone, '')), '') is null then
+    raise exception 'CUSTOMER_REQUIRED';
+  end if;
+
+  v_local := (v_now at time zone 'America/La_Paz')::date;
+  if (v_now at time zone 'America/La_Paz')::time < time '06:00'
+     or (v_now at time zone 'America/La_Paz')::time >= time '11:00' then
+    raise exception 'OUT_OF_HOURS';
+  end if;
+
+  if p_pickup_time is null or p_pickup_time < time '06:00' or p_pickup_time > time '11:00' then
+    raise exception 'INVALID_PICKUP_TIME';
+  end if;
+
+  v_closing := (v_local + time '11:00') at time zone 'America/La_Paz';
+  if p_expires_at is null or p_expires_at <= v_now or p_expires_at > v_closing then
+    raise exception 'INVALID_EXPIRY';
+  end if;
+
+  if p_user_id is not null
+     and not exists (select 1 from carts where id = p_cart_id and user_id = p_user_id) then
+    raise exception 'CART_FORBIDDEN';
+  end if;
+
   perform pg_advisory_xact_lock(hashtext('saltenanga_order_code'));
   select count(*) into v_bad
     from cart_items ci join products p on p.id = ci.product_id
@@ -97,9 +135,9 @@ begin
     from cart_items ci join products p on p.id = ci.product_id
     where ci.cart_id = p_cart_id;
   if v_total <= 0 then raise exception 'CART_EMPTY'; end if;
-  v_code := 'SAL-' || to_char(now() at time zone 'America/La_Paz','YYYYMMDD') || '-' ||
+  v_code := 'SAL-' || to_char(v_now at time zone 'America/La_Paz','YYYYMMDD') || '-' ||
             lpad(((select count(*) + 1 from orders
-                   where code like 'SAL-' || to_char(now() at time zone 'America/La_Paz','YYYYMMDD') || '-%'))::text, 4, '0');
+                   where code like 'SAL-' || to_char(v_now at time zone 'America/La_Paz','YYYYMMDD') || '-%'))::text, 4, '0');
   insert into orders (code,user_id,customer_name,customer_phone,pickup_time,notes,
                       payment_method,total_bs,status,expires_at)
     values (v_code,p_user_id,p_customer_name,p_customer_phone,p_pickup_time,p_notes,
@@ -111,3 +149,8 @@ begin
   delete from cart_items where cart_id = p_cart_id;
   return v_order_id;
 end $$;
+
+revoke all on function create_order_from_cart(uuid, uuid, text, text, time, text, payment_method, timestamptz)
+  from public, anon, authenticated;
+grant execute on function create_order_from_cart(uuid, uuid, text, text, time, text, payment_method, timestamptz)
+  to service_role;
