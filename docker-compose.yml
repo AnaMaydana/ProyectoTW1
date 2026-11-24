@@ -1,0 +1,12 @@
+services:
+  api:
+    build: ./apps/api
+    ports: ["${API_PORT:-3001}:3001"]
+    env_file: .env
+  web:
+    build: ./apps/web
+    ports: ["${WEB_PORT:-3000}:3000"]
+    env_file: .env
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-3001}
+    depends_on: [api]

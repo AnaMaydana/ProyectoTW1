@@ -1,0 +1,9 @@
+{
+  "name": "saltenanga",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["apps/api", "apps/web"],
+  "devDependencies": {
+    "pg": "^8.13.0"
+  }
+}
