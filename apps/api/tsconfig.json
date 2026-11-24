@@ -3,6 +3,7 @@
     "module": "commonjs",
     "target": "ES2022",
     "strict": true,
+    "strictPropertyInitialization": false,
     "esModuleInterop": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,

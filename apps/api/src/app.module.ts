@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { SupabaseModule } from './supabase/supabase.module';
+import { AuthModule } from './auth/auth.module';
 
-@Module({ imports: [SupabaseModule] })
+@Module({ imports: [SupabaseModule, AuthModule] })
 export class AppModule {}
