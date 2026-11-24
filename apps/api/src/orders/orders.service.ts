@@ -19,6 +19,9 @@ export class OrdersService {
     dto: CreateOrderDto,
     customer: { name: string; phone: string }
   ) {
+    if (!userId && (!customer.name?.trim() || !customer.phone?.trim())) {
+      throw new BadRequestException('Nombre y celular son obligatorios');
+    }
     const current = await this.cart.getCart(cartId);
     if (current.items.length === 0) throw new BadRequestException('Carrito vacío');
 
@@ -104,14 +107,14 @@ export class OrdersService {
     const ids = (items ?? []).map((item: any) => item.product_id);
     const { data: products } = await this.sb.admin
       .from('products')
-      .select('id,active,available_today')
+      .select('id,name,active,available_today')
       .in('id', ids);
 
     const skipped: string[] = [];
     for (const item of items ?? []) {
       const product = (products ?? []).find((p: any) => p.id === item.product_id);
       if (!product || !product.active || !product.available_today) {
-        skipped.push(item.product_id);
+        skipped.push(product?.name ?? item.product_id);
         continue;
       }
       const { error } = await this.sb.admin.from('cart_items').upsert(

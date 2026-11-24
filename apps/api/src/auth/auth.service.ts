@@ -51,20 +51,22 @@ export class AuthService {
   }
 
   async me(access?: string, refresh?: string, res?: Response) {
-    let token = access;
-    if (!token && refresh && res) {
-      const { data, error } = await this.sb.anon.auth.refreshSession({
-        refresh_token: refresh
-      });
-      if (error || !data.session) throw new UnauthorizedException();
-      token = data.session.access_token;
-      this.cookies.setSession(res, token, data.session.refresh_token, true);
+    if (access) {
+      const { data, error } = await this.sb.anon.auth.getUser(access);
+      if (!error && data?.user) return this.hydrate(data.user.id, data.user.email!);
     }
-    if (!token) throw new UnauthorizedException();
 
-    const { data, error } = await this.sb.anon.auth.getUser(token);
-    if (error || !data.user) throw new UnauthorizedException();
-    return this.hydrate(data.user.id, data.user.email!);
+    if (!refresh || !res) throw new UnauthorizedException();
+    const { data, error } = await this.sb.anon.auth.refreshSession({
+      refresh_token: refresh
+    });
+    if (error || !data?.session) throw new UnauthorizedException();
+    const token = data.session.access_token;
+    this.cookies.setSession(res, token, data.session.refresh_token, true);
+
+    const { data: userData, error: userError } = await this.sb.anon.auth.getUser(token);
+    if (userError || !userData?.user) throw new UnauthorizedException();
+    return this.hydrate(userData.user.id, userData.user.email!);
   }
 
   async updateName(access: string | undefined, dto: UpdateProfileDto) {

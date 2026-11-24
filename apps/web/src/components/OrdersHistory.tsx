@@ -28,7 +28,7 @@ export function OrdersHistory({
       window.dispatchEvent(new Event('cart:changed'));
       setMessage(
         response.skipped.length > 0
-          ? `Productos agotados omitidos: ${response.skipped.length}`
+          ? `Productos agotados omitidos: ${response.skipped.join(', ')}`
           : 'Productos copiados al carrito'
       );
     } catch (err) {

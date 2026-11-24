@@ -17,4 +17,13 @@ describe('buildExpiry', () => {
     expect(result.expiresAt.toISOString()).toBe('2026-11-24T15:00:00.000Z');
     expect(result.minutesLeft).toBe(1);
   });
+
+  it('rechaza pedidos fuera del horario 06:00-11:00', () => {
+    expect(() => buildExpiry(new Date('2026-11-24T16:00:00.000Z'))).toThrow(
+      'Fuera de horario'
+    );
+    expect(() => buildExpiry(new Date('2026-11-24T09:00:00.000Z'))).toThrow(
+      'Fuera de horario'
+    );
+  });
 });

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
 export interface CartItem {
@@ -69,7 +69,7 @@ export class CartService {
       .eq('id', productId)
       .single();
     if (!product || !product.active || !product.available_today) {
-      throw new BadRequestException('Producto no disponible');
+      throw new ConflictException('Producto agotado hoy');
     }
     const { error } = await this.admin.from('cart_items').upsert(
       { cart_id: cartId, product_id: productId, quantity },

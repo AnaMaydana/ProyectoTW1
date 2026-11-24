@@ -27,4 +27,19 @@ describe('CartService', () => {
     await expect(service.addItem('cart1', 'p1', 0)).rejects.toThrow('Cantidad inválida');
     expect(admin.from).not.toHaveBeenCalled();
   });
+
+  it('responde 409 cuando el producto está agotado', async () => {
+    admin.from.mockReturnValue({
+      select: () => ({
+        eq: () => ({
+          single: () => Promise.resolve({
+            data: { id: 'p1', active: true, available_today: false },
+            error: null
+          })
+        })
+      })
+    });
+
+    await expect(service.addItem('cart1', 'p1', 1)).rejects.toMatchObject({ status: 409 });
+  });
 });

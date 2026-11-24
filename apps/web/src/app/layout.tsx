@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { business } from '../config/business';
 import { CartProvider } from '../components/CartProvider';
+import { AuthNav } from '../components/AuthNav';
 
 export const metadata: Metadata = {
   title: business.name,
@@ -17,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <nav>
             <a href="/menu">Menú</a>
             <a href="/orders">Mis pedidos</a>
-            <a href="/login">Ingresar</a>
+            <AuthNav />
           </nav>
         </header>
         <CartProvider>{children}</CartProvider>

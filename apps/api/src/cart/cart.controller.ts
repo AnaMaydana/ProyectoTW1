@@ -28,8 +28,13 @@ export class CartController {
   }
 
   @Delete('items/:productId')
-  async remove(@Req() req: Request, @Param('productId') productId: string) {
+  async remove(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Param('productId') productId: string
+  ) {
     const id = await this.cart.getOrCreate(this.cookies.read(req, 'cart_id'));
+    this.cookies.setCart(res, id);
     return { cart: await this.cart.removeItem(id, productId) };
   }
 }

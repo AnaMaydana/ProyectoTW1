@@ -35,8 +35,11 @@ const customer = { name: 'Ana', phone: '70000000' };
 describe('OrdersService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers().setSystemTime(new Date('2026-11-24T14:50:00.000Z'));
     cart.getCart.mockResolvedValue({ items: [{ productId: 'p1', quantity: 2 }], totalBs: '24.00' });
   });
+
+  afterEach(() => jest.useRealTimers());
 
   it('crea pedido con expires_at calculado y código', async () => {
     sb.admin.rpc.mockResolvedValue({ data: 'o1', error: null });
@@ -57,6 +60,13 @@ describe('OrdersService', () => {
     expect(sb.admin.rpc).not.toHaveBeenCalled();
   });
 
+  it('rechaza pedido anónimo sin nombre o celular', async () => {
+    await expect(
+      service.create(null, 'cart1', dto, { name: '', phone: '' })
+    ).rejects.toThrow('Nombre y celular son obligatorios');
+    expect(sb.admin.rpc).not.toHaveBeenCalled();
+  });
+
   it('no cancela pedido vencido o ya confirmado', async () => {
     sb.admin.from.mockReturnValue(mockChain({ data: null, error: { message: 'no rows' } }));
     await expect(service.cancel('u1', 'o1')).rejects.toThrow('llamá al local');
@@ -71,8 +81,8 @@ describe('OrdersService', () => {
       }))
       .mockReturnValueOnce(mockChain({
         data: [
-          { id: 'p1', active: true, available_today: true },
-          { id: 'p2', active: true, available_today: false }
+          { id: 'p1', name: 'Carne', active: true, available_today: true },
+          { id: 'p2', name: 'Queso', active: true, available_today: false }
         ],
         error: null
       }))
@@ -80,7 +90,7 @@ describe('OrdersService', () => {
 
     const result = await service.repeat('u1', 'cart1', 'o1');
 
-    expect(result.skipped).toEqual(['p2']);
+    expect(result.skipped).toEqual(['Queso']);
     expect(sb.admin.from).toHaveBeenCalledWith('cart_items');
   });
 });

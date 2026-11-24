@@ -65,4 +65,33 @@ describe('AuthService', () => {
     expect(call).toBeDefined();
     expect(call[2].maxAge).toBe(30 * 24 * 60 * 60 * 1000);
   });
+
+  it('renueva la sesión aunque exista sb_access vencido', async () => {
+    sb.anon.auth.getUser
+      .mockResolvedValueOnce({ data: { user: null }, error: { message: 'expired' } })
+      .mockResolvedValueOnce({
+        data: { user: { id: 'u1', email: 'a@b.com' } },
+        error: null
+      });
+    sb.anon.auth.refreshSession.mockResolvedValue({
+      data: { session: { access_token: 'new', refresh_token: 'r2' } },
+      error: null
+    });
+    sb.admin.from.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        eq: () => ({
+          single: () => Promise.resolve({
+            data: { name: 'Ana', phone: '70000000', role: 'CLIENTE' }, error: null
+          })
+        })
+      })
+    });
+    const res = { cookie: jest.fn() } as any;
+
+    const user = await service.me('old', 'r', res);
+
+    expect(sb.anon.auth.refreshSession).toHaveBeenCalledWith({ refresh_token: 'r' });
+    expect(res.cookie).toHaveBeenCalledWith('sb_access', 'new', expect.anything());
+    expect(user.id).toBe('u1');
+  });
 });
