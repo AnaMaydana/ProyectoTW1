@@ -29,6 +29,7 @@
     "preset": "ts-jest",
     "testEnvironment": "jsdom",
     "setupFilesAfterEnv": ["<rootDir>/jest.setup.ts"],
+    "testPathIgnorePatterns": ["<rootDir>/e2e/", "<rootDir>/.next/"],
     "transform": {
       "^.+\\.(ts|tsx)$": ["ts-jest", {
         "tsconfig": {
