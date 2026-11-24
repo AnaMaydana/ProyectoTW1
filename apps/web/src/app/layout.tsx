@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { business } from '../config/business';
+import { CartProvider } from '../components/CartProvider';
 
 export const metadata: Metadata = {
   title: business.name,
@@ -19,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="/login">Ingresar</a>
           </nav>
         </header>
-        {children}
+        <CartProvider>{children}</CartProvider>
       </body>
     </html>
   );
