@@ -59,6 +59,8 @@ docker compose up --build
 - Web: http://localhost:3000
 - API: http://localhost:3001
 
+Dentro de Docker, el servidor de Next.js llama a la API por `API_INTERNAL_URL=http://api:3001` (nombre de servicio); el navegador sigue usando `NEXT_PUBLIC_API_URL=http://localhost:3001`. `API_INTERNAL_URL` lo define `docker-compose.yml`, no hace falta ponerlo en `.env`.
+
 Sin Docker, con Node 20+:
 
 ```bash
@@ -94,7 +96,14 @@ npx playwright install chromium
 npm -w apps/web run e2e
 ```
 
-Los tres proyectos de Playwright cubren 360×800, 768×1024 y 1366×768: registro, carrito persistente al cerrar el navegador, checkout y código de pedido.
+Los tres proyectos de Playwright cubren 360×800, 768×1024 y 1366×768: registro, carrito persistente al cerrar el navegador, checkout y código de pedido. Cada corrida crea un usuario y un pedido reales en Supabase.
+
+Si se ejecutan fuera del horario 06:00–11:00, fijar el reloj del negocio solo para la corrida (se ignora cuando `NODE_ENV=production`):
+
+```powershell
+$env:E2E_FIXED_NOW = '2026-11-25T14:00:00.000Z'
+npm -w apps/web run e2e
+```
 
 ## Fases pendientes
 

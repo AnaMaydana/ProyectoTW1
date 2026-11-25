@@ -7,7 +7,7 @@ import {
 import { DatabaseService } from '../database/database.service';
 import { CartService } from '../cart/cart.service';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { buildExpiry } from './expiry';
+import { buildExpiry, businessNow } from './expiry';
 
 interface OrderItemRow {
   id_producto: number;
@@ -18,7 +18,7 @@ interface OrderItemRow {
   disponible_hoy: boolean;
 }
 
-function localDate(now: Date = new Date()): string {
+function localDate(now: Date = businessNow()): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/La_Paz',
     year: 'numeric',

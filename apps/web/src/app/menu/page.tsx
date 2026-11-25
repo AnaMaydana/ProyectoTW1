@@ -2,7 +2,9 @@ import { ProductCard } from '../../components/ProductCard';
 import { BusinessInfo } from '../../components/BusinessInfo';
 import { Product } from '../../lib/types';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+// Server Components corren dentro del contenedor `web`: ahí `localhost` es el
+// propio contenedor. En Docker se usa el nombre de servicio `api`.
+const BASE = process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default async function Menu({
   searchParams

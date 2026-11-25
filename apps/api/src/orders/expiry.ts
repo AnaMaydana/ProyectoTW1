@@ -3,7 +3,20 @@ import { BadRequestException } from '@nestjs/common';
 const WINDOW_MINUTES = 30;
 const CLOSING_TIME = '11:00:00-04:00';
 
-export function buildExpiry(now: Date = new Date()) {
+/**
+ * Reloj del negocio. `E2E_FIXED_NOW` solo se respeta fuera de producción para
+ * poder ejecutar el flujo de pedidos a cualquier hora (tests E2E).
+ */
+export function businessNow(): Date {
+  const fixed = process.env.E2E_FIXED_NOW;
+  if (fixed && process.env.NODE_ENV !== 'production') {
+    const parsed = new Date(fixed);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+}
+
+export function buildExpiry(now: Date = businessNow()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/La_Paz',
     year: 'numeric',
