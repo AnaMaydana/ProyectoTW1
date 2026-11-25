@@ -42,6 +42,7 @@ const client = new Client({
   ssl: { rejectUnauthorized: false }
 });
 await client.connect();
+let counts;
 try {
   for (const [table, cols] of Object.entries(expected)) {
     const result = await client.query(
@@ -75,7 +76,7 @@ try {
     union all select 'producto', count(*)::int from producto
     union all select 'inventario', count(*)::int from inventario
   `);
-  const counts = Object.fromEntries(seeds.rows.map((r) => [r.t, r.n]));
+  counts = Object.fromEntries(seeds.rows.map((r) => [r.t, r.n]));
   for (const [table, min] of Object.entries({ rol: 3, metodo_pago: 4, categoria: 3, producto: 7, inventario: 7 })) {
     if (counts[table] < min) throw new Error(`Seed incompleto en ${table}: ${counts[table]}`);
   }

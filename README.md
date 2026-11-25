@@ -29,6 +29,8 @@ LOW_TIME_WARNING_MINUTES=10
 NODE_ENV=development
 ```
 
+En este entorno `.env` ya está configurado con el **session pooler** (`aws-1-us-west-2.pooler.supabase.com:5432`) y el rol dedicado `saltenanga_app` (credencial local, no versionada). El host directo `db.<ref>.supabase.co` no resuelve desde aquí, así que se usa el pooler.
+
 2. El esquema y el seed ya están aplicados en Supabase. Para reaplicarlos desde cero:
 
 ```bash
@@ -46,7 +48,7 @@ node scripts/verify-db.mjs
 
 `saltenanga_schema.sql` se conserva con el contenido exacto entregado. `saltenanga_schema_adaptado.sql` mantiene esos nombres de tablas y columnas y agrega: carrito, datos de cliente invitado, vencimiento, disponibilidad del día y consistencia de subtotal.
 
-`supabase/migrations/0002_rls_policies.sql` habilita RLS en las 12 tablas: lectura pública de solo filas activas del catálogo (`categoria`, `producto`, `inventario`, `metodo_pago`) y acceso denegado a `anon`/`authenticated` en el resto. La API conecta por Postgres directo como propietario de las tablas, así que no se ve afectada. `supabase/migrations/0001_init.sql` pertenece al modelo anterior y no se aplica.
+`supabase/migrations/0002_rls_policies.sql` habilita RLS en las 12 tablas: lectura pública de solo filas activas del catálogo (`categoria`, `producto`, `inventario`, `metodo_pago`) y acceso denegado a `anon`/`authenticated` en el resto. El rol de la API (`saltenanga_app`) tiene políticas `app_acceso` en las 12 tablas; `anon`/`authenticated` siguen sin acceso a datos de negocio. `supabase/migrations/0001_init.sql` pertenece al modelo anterior y no se aplica.
 
 ## Arranque
 
