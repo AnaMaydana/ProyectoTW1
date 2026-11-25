@@ -1,49 +1,41 @@
 import { ProductsService } from './products.service';
+import { DatabaseService } from '../database/database.service';
 
-const sb = { admin: { from: jest.fn() } } as any;
-const service = new ProductsService(sb);
+const db = { query: jest.fn() } as unknown as DatabaseService;
+const service = new ProductsService(db);
 
 describe('ProductsService', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('filtra por categoría y marca agotado', async () => {
-    const rows = [{
-      id: 'p1',
-      category_id: '11111111-1111-4111-8111-111111111111',
-      name: 'Carne',
-      description: 'Salteña de carne',
-      price_bs: '12.00',
-      image_url: null,
-      available_today: false,
-      active: true,
-      categories: { name: 'salteñas' }
-    }];
-    const order = jest.fn().mockResolvedValue({ data: rows, error: null });
-    const chain: any = { order };
-    chain.eq = jest.fn().mockReturnValue(chain);
-    sb.admin.from.mockReturnValue({ select: () => chain });
+    (db.query as jest.Mock).mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{
+        id_producto: 1,
+        id_categoria: 1,
+        categoria: 'Salteñas',
+        nombre: 'Carne',
+        descripcion: 'Salteña de carne',
+        precio: '12.00',
+        foto_url: null,
+        disponible_hoy: false
+      }]
+    });
 
     const products = await service.list(undefined, 'salteñas');
 
-    expect(chain.eq).toHaveBeenCalledWith('active', true);
-    expect(chain.eq).toHaveBeenCalledWith(
-      'category_id',
-      '11111111-1111-4111-8111-111111111111'
-    );
-    expect(order).toHaveBeenCalledWith('name');
+    expect((db.query as jest.Mock).mock.calls[0][1]).toEqual(['salteñas']);
     expect(products[0].availableToday).toBe(false);
     expect(products[0].priceBs).toBe('12.00');
-    expect(products[0].categoryName).toBe('salteñas');
+    expect(products[0].categoryName).toBe('Salteñas');
+    expect(products[0].id).toBe('1');
   });
 
-  it('busca por nombre con ilike', async () => {
-    const chain: any = { order: jest.fn().mockResolvedValue({ data: [], error: null }) };
-    chain.eq = jest.fn().mockReturnValue(chain);
-    chain.ilike = jest.fn().mockReturnValue(chain);
-    sb.admin.from.mockReturnValue({ select: () => chain });
+  it('busca por nombre con parámetro LIKE', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({ rowCount: 0, rows: [] });
 
     await service.list('carne');
 
-    expect(chain.ilike).toHaveBeenCalledWith('name', '%carne%');
+    expect((db.query as jest.Mock).mock.calls[0][1]).toEqual(['%carne%']);
   });
 });

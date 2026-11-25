@@ -25,17 +25,17 @@ export class OrdersController {
   ) {}
 
   private async context(req: Request, res: Response) {
-    const cartId = await this.cart.getOrCreate(this.cookies.read(req, 'cart_id'));
+    const cartToken = await this.cart.getOrCreate(this.cookies.read(req, 'cart_id'));
     const access = this.cookies.read(req, 'sb_access');
-    const refresh = this.cookies.read(req, 'sb_refresh');
     let user: any = null;
     try {
-      user = await this.auth.me(access, refresh, res);
+      user = await this.auth.me(access);
     } catch {
       user = null;
     }
-    if (user) await this.cart.attachUser(cartId, user.id);
-    return { cartId, user };
+    if (user) await this.cart.attachUser(cartToken, user.id);
+    this.cookies.setCart(res, cartToken);
+    return { cartToken, user };
   }
 
   @Post()
@@ -44,11 +44,11 @@ export class OrdersController {
     @Res({ passthrough: true }) res: Response,
     @Body() dto: CreateOrderDto
   ) {
-    const { cartId, user } = await this.context(req, res);
+    const { cartToken, user } = await this.context(req, res);
     return {
       order: await this.orders.create(
         user?.id ?? null,
-        cartId,
+        cartToken,
         dto,
         {
           name: user?.name || dto.customerName || '',
@@ -71,9 +71,9 @@ export class OrdersController {
     @Res({ passthrough: true }) res: Response,
     @Param('id') id: string
   ) {
-    const { cartId, user } = await this.context(req, res);
+    const { cartToken, user } = await this.context(req, res);
     if (!user) throw new UnauthorizedException('Ingresá para repetir un pedido');
-    return this.orders.repeat(user.id, cartId, id);
+    return this.orders.repeat(user.id, cartToken, id);
   }
 
   @Post(':id/cancel')

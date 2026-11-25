@@ -4,139 +4,255 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
 import { CartService } from '../cart/cart.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { buildExpiry } from './expiry';
 
+interface OrderItemRow {
+  id_producto: number;
+  cantidad: number;
+  precio: string;
+  nombre: string;
+  activo: boolean;
+  disponible_hoy: boolean;
+}
+
+function localDate(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/La_Paz',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
 @Injectable()
 export class OrdersService {
-  constructor(private sb: SupabaseService, private cart: CartService) {}
+  constructor(private db: DatabaseService, private cart: CartService) {}
 
   async create(
     userId: string | null,
-    cartId: string,
+    cartToken: string,
     dto: CreateOrderDto,
     customer: { name: string; phone: string }
   ) {
     if (!userId && (!customer.name?.trim() || !customer.phone?.trim())) {
       throw new BadRequestException('Nombre y celular son obligatorios');
     }
-    const current = await this.cart.getCart(cartId);
+    const current = await this.cart.getCart(cartToken);
     if (current.items.length === 0) throw new BadRequestException('Carrito vacío');
 
     const { expiresAt } = buildExpiry();
-    const { data, error } = await this.sb.admin.rpc('create_order_from_cart', {
-      p_user_id: userId,
-      p_cart_id: cartId,
-      p_customer_name: customer.name,
-      p_customer_phone: customer.phone,
-      p_pickup_time: dto.pickupTime,
-      p_notes: dto.notes ?? null,
-      p_payment_method: dto.paymentMethod,
-      p_expires_at: expiresAt
+    const date = localDate();
+    const pickup = `${date}T${dto.pickupTime}:00`;
+
+    const orderId = await this.db.transaction(async (client) => {
+      const cart = await client.query<{ id_carrito: number }>(
+        'SELECT id_carrito FROM carrito WHERE token = $1 FOR UPDATE',
+        [cartToken]
+      );
+      if (!cart.rowCount) throw new BadRequestException('Carrito no encontrado');
+      const idCarrito = cart.rows[0].id_carrito;
+
+      const items = await client.query<OrderItemRow>(
+        `SELECT cd.id_producto, cd.cantidad, p.precio, p.nombre, p.activo,
+                COALESCE(i.disponible_hoy, FALSE) AS disponible_hoy
+         FROM carrito_detalle cd
+         JOIN producto p ON p.id_producto = cd.id_producto
+         LEFT JOIN inventario i ON i.id_producto = p.id_producto
+         WHERE cd.id_carrito = $1`,
+        [idCarrito]
+      );
+      if (!items.rowCount) throw new BadRequestException('Carrito vacío');
+      if (items.rows.some((item) => !item.activo || !item.disponible_hoy)) {
+        throw new ConflictException('Algún producto se agotó');
+      }
+
+      const total = items.rows.reduce(
+        (sum, item) => sum + Number(item.precio) * item.cantidad,
+        0
+      );
+
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('saltenanga_order_code'))");
+      const dayCode = date.replace(/-/g, '');
+      const sequence = await client.query<{ n: number }>(
+        'SELECT COUNT(*)::int AS n FROM pedido WHERE codigo LIKE $1',
+        [`SAL-${dayCode}-%`]
+      );
+      const code = `SAL-${dayCode}-${String(sequence.rows[0].n + 1).padStart(4, '0')}`;
+
+      const method = await client.query<{ id_metodo_pago: number }>(
+        'SELECT id_metodo_pago FROM metodo_pago WHERE nombre = $1',
+        [dto.paymentMethod]
+      );
+      if (!method.rowCount) throw new BadRequestException('Método de pago inválido');
+
+      const inserted = await client.query<{ id_pedido: number }>(
+        `INSERT INTO pedido
+           (codigo, id_usuario, cliente_nombre, cliente_celular, fecha_hora_recojo,
+            observaciones, total, estado, fecha_creacion, fecha_confirmacion, fecha_expiracion)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'PENDIENTE',NOW(),NOW(),$8)
+         RETURNING id_pedido`,
+        [
+          code,
+          userId ? Number(userId) : null,
+          customer.name,
+          customer.phone,
+          pickup,
+          dto.notes ?? null,
+          total.toFixed(2),
+          expiresAt
+        ]
+      );
+      const idPedido = inserted.rows[0].id_pedido;
+
+      for (const item of items.rows) {
+        await client.query(
+          `INSERT INTO detalle_pedido
+             (id_pedido, id_producto, cantidad, precio_unitario, subtotal)
+           VALUES ($1,$2,$3,$4,$5)`,
+          [
+            idPedido,
+            item.id_producto,
+            item.cantidad,
+            Number(item.precio).toFixed(2),
+            (Number(item.precio) * item.cantidad).toFixed(2)
+          ]
+        );
+      }
+
+      await client.query(
+        `INSERT INTO pago (id_pedido, id_metodo_pago, monto, estado)
+         VALUES ($1,$2,$3,'PENDIENTE')`,
+        [idPedido, method.rows[0].id_metodo_pago, total.toFixed(2)]
+      );
+      await client.query('DELETE FROM carrito_detalle WHERE id_carrito = $1', [idCarrito]);
+      return idPedido;
     });
-    if (error) {
-      throw error.message.includes('PRODUCT_UNAVAILABLE')
-        ? new ConflictException('Algún producto se agotó')
-        : new BadRequestException('No se pudo crear el pedido');
-    }
-    return this.findOne(data as string);
+
+    return this.findOne(String(orderId));
   }
 
   async findOne(id: string) {
-    const { data, error } = await this.sb.admin
-      .from('orders')
-      .select(
-        'id,code,total_bs,status,pickup_time,notes,payment_method,expires_at,created_at,order_items(product_id,quantity,unit_price_bs,products(name))'
-      )
-      .eq('id', id)
-      .single();
-    if (error || !data) throw new NotFoundException('Pedido no encontrado');
+    const result = await this.db.query<any>(
+      `SELECT p.id_pedido, p.codigo, p.total, p.estado, p.observaciones,
+              to_char(p.fecha_hora_recojo, 'HH24:MI') AS pickup_time,
+              p.fecha_expiracion, p.fecha_creacion,
+              mp.nombre AS payment_method,
+              d.id_producto, d.cantidad, d.precio_unitario, pr.nombre AS product_name
+       FROM pedido p
+       LEFT JOIN pago pg ON pg.id_pedido = p.id_pedido
+       LEFT JOIN metodo_pago mp ON mp.id_metodo_pago = pg.id_metodo_pago
+       LEFT JOIN detalle_pedido d ON d.id_pedido = p.id_pedido
+       LEFT JOIN producto pr ON pr.id_producto = d.id_producto
+       WHERE p.id_pedido = $1`,
+      [Number(id)]
+    );
+    if (!result.rowCount) throw new NotFoundException('Pedido no encontrado');
 
+    const first = result.rows[0];
     return {
-      id: data.id,
-      code: data.code,
-      totalBs: Number(data.total_bs).toFixed(2),
-      status: data.status,
-      pickupTime: data.pickup_time,
-      notes: data.notes,
-      paymentMethod: data.payment_method,
-      expiresAt: data.expires_at,
-      createdAt: data.created_at,
-      items: (data.order_items ?? []).map((item: any) => ({
-        productId: item.product_id,
-        name: item.products?.name ?? '',
-        quantity: item.quantity,
-        unitPriceBs: Number(item.unit_price_bs).toFixed(2)
-      }))
+      id: String(first.id_pedido),
+      code: first.codigo,
+      totalBs: Number(first.total).toFixed(2),
+      status: first.estado,
+      pickupTime: first.pickup_time,
+      notes: first.observaciones,
+      paymentMethod: first.payment_method ?? 'EFECTIVO',
+      expiresAt: first.fecha_expiracion,
+      createdAt: first.fecha_creacion,
+      items: result.rows
+        .filter((row) => row.id_producto != null)
+        .map((row) => ({
+          productId: String(row.id_producto),
+          name: row.product_name,
+          quantity: row.cantidad,
+          unitPriceBs: Number(row.precio_unitario).toFixed(2)
+        }))
     };
   }
 
   async list(userId: string) {
-    const { data } = await this.sb.admin
-      .from('orders')
-      .select('id,code,total_bs,status,pickup_time,payment_method,expires_at,created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    return (data ?? []).map((order: any) => ({
-      id: order.id,
-      code: order.code,
-      totalBs: Number(order.total_bs).toFixed(2),
-      status: order.status,
+    const result = await this.db.query<any>(
+      `SELECT p.id_pedido, p.codigo, p.total, p.estado,
+              to_char(p.fecha_hora_recojo, 'HH24:MI') AS pickup_time,
+              mp.nombre AS payment_method, p.fecha_expiracion, p.fecha_creacion
+       FROM pedido p
+       LEFT JOIN pago pg ON pg.id_pedido = p.id_pedido
+       LEFT JOIN metodo_pago mp ON mp.id_metodo_pago = pg.id_metodo_pago
+       WHERE p.id_usuario = $1
+       ORDER BY p.fecha_creacion DESC`,
+      [Number(userId)]
+    );
+    return result.rows.map((order) => ({
+      id: String(order.id_pedido),
+      code: order.codigo,
+      totalBs: Number(order.total).toFixed(2),
+      status: order.estado,
       pickupTime: order.pickup_time,
-      paymentMethod: order.payment_method,
-      expiresAt: order.expires_at,
-      createdAt: order.created_at
+      paymentMethod: order.payment_method ?? 'EFECTIVO',
+      expiresAt: order.fecha_expiracion,
+      createdAt: order.fecha_creacion
     }));
   }
 
-  async repeat(userId: string, cartId: string, orderId: string) {
-    const { data: order } = await this.sb.admin
-      .from('orders')
-      .select('id')
-      .eq('id', orderId)
-      .eq('user_id', userId)
-      .single();
-    if (!order) throw new NotFoundException('Pedido no encontrado');
+  async repeat(userId: string, cartToken: string, orderId: string) {
+    const owned = await this.db.query(
+      'SELECT 1 FROM pedido WHERE id_pedido = $1 AND id_usuario = $2',
+      [Number(orderId), Number(userId)]
+    );
+    if (!owned.rowCount) throw new NotFoundException('Pedido no encontrado');
 
-    const { data: items } = await this.sb.admin
-      .from('order_items')
-      .select('product_id,quantity')
-      .eq('order_id', orderId);
-    const ids = (items ?? []).map((item: any) => item.product_id);
-    const { data: products } = await this.sb.admin
-      .from('products')
-      .select('id,name,active,available_today')
-      .in('id', ids);
+    const items = await this.db.query<{
+      id_producto: number;
+      cantidad: number;
+      nombre: string;
+      activo: boolean;
+      disponible_hoy: boolean;
+    }>(
+      `SELECT d.id_producto, d.cantidad, p.nombre, p.activo,
+              COALESCE(i.disponible_hoy, FALSE) AS disponible_hoy
+       FROM detalle_pedido d
+       JOIN producto p ON p.id_producto = d.id_producto
+       LEFT JOIN inventario i ON i.id_producto = p.id_producto
+       WHERE d.id_pedido = $1`,
+      [Number(orderId)]
+    );
+    const cart = await this.db.query<{ id_carrito: number }>(
+      'SELECT id_carrito FROM carrito WHERE token = $1',
+      [cartToken]
+    );
+    if (!cart.rowCount) throw new BadRequestException('Carrito no encontrado');
 
     const skipped: string[] = [];
-    for (const item of items ?? []) {
-      const product = (products ?? []).find((p: any) => p.id === item.product_id);
-      if (!product || !product.active || !product.available_today) {
-        skipped.push(product?.name ?? item.product_id);
+    for (const item of items.rows) {
+      if (!item.activo || !item.disponible_hoy) {
+        skipped.push(item.nombre);
         continue;
       }
-      const { error } = await this.sb.admin.from('cart_items').upsert(
-        { cart_id: cartId, product_id: item.product_id, quantity: item.quantity },
-        { onConflict: 'cart_id,product_id' }
+      await this.db.query(
+        `INSERT INTO carrito_detalle (id_carrito, id_producto, cantidad)
+         VALUES ($1,$2,$3)
+         ON CONFLICT (id_carrito, id_producto) DO UPDATE SET cantidad = EXCLUDED.cantidad`,
+        [cart.rows[0].id_carrito, item.id_producto, item.cantidad]
       );
-      if (error) throw new Error(error.message);
     }
-    return { cart: await this.cart.getCart(cartId), skipped };
+    return { cart: await this.cart.getCart(cartToken), skipped };
   }
 
   async cancel(userId: string, orderId: string) {
-    const { data, error } = await this.sb.admin
-      .from('orders')
-      .update({ status: 'CANCELADO' })
-      .eq('id', orderId)
-      .eq('user_id', userId)
-      .eq('status', 'PENDIENTE')
-      .gt('expires_at', new Date().toISOString())
-      .select()
-      .single();
-    if (!data || error) {
+    const updated = await this.db.query(
+      `UPDATE pedido
+       SET estado = 'CANCELADO'
+       WHERE id_pedido = $1 AND id_usuario = $2 AND estado = 'PENDIENTE'
+         AND fecha_expiracion > NOW()
+       RETURNING id_pedido`,
+      [Number(orderId), Number(userId)]
+    );
+    if (!updated.rowCount) {
       throw new ConflictException('No se puede cancelar; llamá al local');
     }
     return this.findOne(orderId);

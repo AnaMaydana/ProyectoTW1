@@ -1,97 +1,76 @@
 import { AuthService } from './auth.service';
 import { CookieService } from '../common/cookies/cookie.service';
+import { DatabaseService } from '../database/database.service';
+import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
 
-const sb = {
-  anon: {
-    auth: {
-      signUp: jest.fn(),
-      signInWithPassword: jest.fn(),
-      getUser: jest.fn(),
-      refreshSession: jest.fn()
-    }
-  },
-  admin: { from: jest.fn() }
-} as any;
-
-const service = new AuthService(sb, new CookieService());
+const db = { query: jest.fn() } as unknown as DatabaseService;
+const service = new AuthService(db, new CookieService());
+const userRow = {
+  id_usuario: 7,
+  correo: 'a@b.com',
+  nombre: 'Ana',
+  celular: '70000000',
+  role: 'CLIENTE'
+};
 
 describe('AuthService', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('registro crea perfil con rol CLIENTE', async () => {
-    sb.anon.auth.signUp.mockResolvedValue({
-      data: { user: { id: 'u1', email: 'a@b.com' } },
-      error: null
-    });
-    sb.admin.from.mockReturnValue({
-      insert: jest.fn().mockReturnValue({
-        select: () => ({
-          single: () => Promise.resolve({
-            data: { name: 'Ana', phone: '70000000', role: 'CLIENTE' },
-            error: null
-          })
-        })
-      })
-    });
+  it('registro crea usuario con rol CLIENTE', async () => {
+    (db.query as jest.Mock)
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id_rol: 2 }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id_usuario: 7 }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [userRow] });
 
     const user = await service.register({
       name: 'Ana', phone: '70000000', email: 'a@b.com', password: 'secret123'
     });
 
     expect(user.role).toBe('CLIENTE');
-    expect(sb.admin.from).toHaveBeenCalledWith('profiles');
+    expect(user.id).toBe('7');
+    expect((db.query as jest.Mock).mock.calls[2][0]).toContain('INSERT INTO usuario');
   });
 
-  it('login con remember setea sb_refresh por 30 días', async () => {
-    sb.anon.auth.signInWithPassword.mockResolvedValue({
-      data: { session: { access_token: 'a', refresh_token: 'r' }, user: { id: 'u1', email: 'a@b.com' } },
-      error: null
-    });
-    sb.anon.auth.getUser.mockResolvedValue({ data: { user: { id: 'u1', email: 'a@b.com' } }, error: null });
-    sb.admin.from.mockReturnValue({
-      select: jest.fn().mockReturnValue({
-        eq: () => ({
-          single: () => Promise.resolve({
-            data: { name: 'Ana', phone: '70000000', role: 'CLIENTE' }, error: null
-          })
-        })
-      })
+  it('login con remember setea sb_access por 30 días', async () => {
+    const passwordHash = await bcrypt.hash('secret123', 10);
+    (db.query as jest.Mock).mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ ...userRow, password_hash: passwordHash }]
     });
     const res = { cookie: jest.fn() } as any;
 
-    await service.login({ email: 'a@b.com', password: 'secret123', remember: true }, res);
+    const user = await service.login(
+      { email: 'a@b.com', password: 'secret123', remember: true },
+      res
+    );
 
-    const call = res.cookie.mock.calls.find((c: any[]) => c[0] === 'sb_refresh');
+    const call = res.cookie.mock.calls.find((c: any[]) => c[0] === 'sb_access');
     expect(call).toBeDefined();
     expect(call[2].maxAge).toBe(30 * 24 * 60 * 60 * 1000);
+    expect(jwt.verify(call[1], 'test-secret')).toMatchObject({ sub: '7' });
+    expect(user.email).toBe('a@b.com');
   });
 
-  it('renueva la sesión aunque exista sb_access vencido', async () => {
-    sb.anon.auth.getUser
-      .mockResolvedValueOnce({ data: { user: null }, error: { message: 'expired' } })
-      .mockResolvedValueOnce({
-        data: { user: { id: 'u1', email: 'a@b.com' } },
-        error: null
-      });
-    sb.anon.auth.refreshSession.mockResolvedValue({
-      data: { session: { access_token: 'new', refresh_token: 'r2' } },
-      error: null
+  it('rechaza credenciales inválidas', async () => {
+    const passwordHash = await bcrypt.hash('otra-clave', 10);
+    (db.query as jest.Mock).mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ ...userRow, password_hash: passwordHash }]
     });
-    sb.admin.from.mockReturnValue({
-      select: jest.fn().mockReturnValue({
-        eq: () => ({
-          single: () => Promise.resolve({
-            data: { name: 'Ana', phone: '70000000', role: 'CLIENTE' }, error: null
-          })
-        })
-      })
-    });
-    const res = { cookie: jest.fn() } as any;
+    await expect(
+      service.login({ email: 'a@b.com', password: 'secret123' }, { cookie: jest.fn() } as any)
+    ).rejects.toThrow('Credenciales inválidas');
+  });
 
-    const user = await service.me('old', 'r', res);
+  it('lee el usuario desde el JWT', async () => {
+    const token = jwt.sign({ sub: '7' }, 'test-secret');
+    (db.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1, rows: [userRow] });
 
-    expect(sb.anon.auth.refreshSession).toHaveBeenCalledWith({ refresh_token: 'r' });
-    expect(res.cookie).toHaveBeenCalledWith('sb_access', 'new', expect.anything());
-    expect(user.id).toBe('u1');
+    const user = await service.me(token);
+
+    expect(user.id).toBe('7');
+    expect((db.query as jest.Mock).mock.calls[0][1]).toEqual([7]);
   });
 });

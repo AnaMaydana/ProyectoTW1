@@ -1,11 +1,11 @@
 import { Body, Controller, Delete, Get, Param, Post, Req, Res } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { IsInt, IsUUID, Min } from 'class-validator';
+import { IsInt, Matches, Min } from 'class-validator';
 import { CartService } from './cart.service';
 import { CookieService } from '../common/cookies/cookie.service';
 
 export class AddItemDto {
-  @IsUUID() productId: string;
+  @Matches(/^\d+$/, { message: 'Producto inválido' }) productId: string;
   @IsInt() @Min(1) quantity: number;
 }
 

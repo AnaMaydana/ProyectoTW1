@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { randomUUID } from 'crypto';
+import { DatabaseService } from '../database/database.service';
 
 export interface CartItem {
   productId: string;
@@ -16,87 +17,116 @@ export interface Cart {
 
 @Injectable()
 export class CartService {
-  constructor(private sb: SupabaseService) {}
+  constructor(private db: DatabaseService) {}
 
-  private get admin() {
-    return this.sb.admin;
-  }
-
-  async getOrCreate(cartId?: string, userId?: string | null): Promise<string> {
-    if (cartId) {
-      const { data } = await this.admin.from('carts').select('id').eq('id', cartId).single();
-      if (data) return data.id;
+  async getOrCreate(token?: string, userId?: string | null): Promise<string> {
+    if (token) {
+      const found = await this.db.query<{ token: string }>(
+        'SELECT token FROM carrito WHERE token = $1',
+        [token]
+      );
+      if (found.rowCount) return found.rows[0].token;
     }
-    const { data, error } = await this.admin
-      .from('carts')
-      .insert({ user_id: userId ?? null })
-      .select('id')
-      .single();
-    if (error || !data) throw new Error(error?.message ?? 'CART_CREATE_FAILED');
-    return data.id;
+    const created = await this.db.query<{ token: string }>(
+      `INSERT INTO carrito (token, id_usuario)
+       VALUES ($1, $2)
+       RETURNING token`,
+      [randomUUID(), userId ? Number(userId) : null]
+    );
+    return created.rows[0].token;
   }
 
-  async getCart(cartId: string): Promise<Cart> {
-    const { data, error } = await this.admin
-      .from('cart_items')
-      .select('cart_id,product_id,quantity,products(name,price_bs,active,available_today)')
-      .eq('cart_id', cartId);
-    if (error) throw new Error(error.message);
+  private async cartId(token: string): Promise<number> {
+    const result = await this.db.query<{ id_carrito: number }>(
+      'SELECT id_carrito FROM carrito WHERE token = $1',
+      [token]
+    );
+    if (!result.rowCount) throw new BadRequestException('Carrito no encontrado');
+    return result.rows[0].id_carrito;
+  }
 
-    const items: CartItem[] = (data ?? [])
-      .filter((r: any) => r.products?.active)
-      .map((r: any) => {
-        const unit = Number(r.products.price_bs).toFixed(2);
-        return {
-          productId: r.product_id,
-          name: r.products.name,
-          quantity: r.quantity,
-          unitPriceBs: unit,
-          subtotalBs: (Number(unit) * r.quantity).toFixed(2)
-        };
-      });
+  async getCart(token: string): Promise<Cart> {
+    const result = await this.db.query<{
+      id_producto: number;
+      nombre: string;
+      cantidad: number;
+      precio: string;
+    }>(
+      `SELECT cd.id_producto, p.nombre, cd.cantidad, p.precio
+       FROM carrito_detalle cd
+       JOIN carrito c ON c.id_carrito = cd.id_carrito
+       JOIN producto p ON p.id_producto = cd.id_producto
+       WHERE c.token = $1 AND p.activo = TRUE
+       ORDER BY p.nombre`,
+      [token]
+    );
+
+    const items: CartItem[] = result.rows.map((row) => {
+      const unit = Number(row.precio).toFixed(2);
+      return {
+        productId: String(row.id_producto),
+        name: row.nombre,
+        quantity: row.cantidad,
+        unitPriceBs: unit,
+        subtotalBs: (Number(unit) * row.cantidad).toFixed(2)
+      };
+    });
     const total = items.reduce((sum, item) => sum + Number(item.subtotalBs), 0);
     return { items, totalBs: total.toFixed(2) };
   }
 
-  async addItem(cartId: string, productId: string, quantity: number): Promise<Cart> {
+  async addItem(token: string, productId: string, quantity: number): Promise<Cart> {
     if (!Number.isInteger(quantity) || quantity < 1) {
       throw new BadRequestException('Cantidad inválida');
     }
-    const { data: product } = await this.admin
-      .from('products')
-      .select('id,active,available_today')
-      .eq('id', productId)
-      .single();
-    if (!product || !product.active || !product.available_today) {
+    if (!/^\d+$/.test(productId)) throw new BadRequestException('Producto inválido');
+
+    const product = await this.db.query<{ activo: boolean; disponible_hoy: boolean }>(
+      `SELECT p.activo, COALESCE(i.disponible_hoy, FALSE) AS disponible_hoy
+       FROM producto p LEFT JOIN inventario i ON i.id_producto = p.id_producto
+       WHERE p.id_producto = $1`,
+      [Number(productId)]
+    );
+    if (!product.rowCount || !product.rows[0].activo || !product.rows[0].disponible_hoy) {
       throw new ConflictException('Producto agotado hoy');
     }
-    const { error } = await this.admin.from('cart_items').upsert(
-      { cart_id: cartId, product_id: productId, quantity },
-      { onConflict: 'cart_id,product_id' }
+
+    const id = await this.cartId(token);
+    await this.db.query(
+      `INSERT INTO carrito_detalle (id_carrito, id_producto, cantidad)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (id_carrito, id_producto) DO UPDATE SET cantidad = EXCLUDED.cantidad`,
+      [id, Number(productId), quantity]
     );
-    if (error) throw new Error(error.message);
-    return this.getCart(cartId);
+    await this.db.query(
+      'UPDATE carrito SET fecha_actualizacion = NOW() WHERE id_carrito = $1',
+      [id]
+    );
+    return this.getCart(token);
   }
 
-  async removeItem(cartId: string, productId: string): Promise<Cart> {
-    const { error } = await this.admin
-      .from('cart_items')
-      .delete()
-      .eq('cart_id', cartId)
-      .eq('product_id', productId);
-    if (error) throw new Error(error.message);
-    return this.getCart(cartId);
+  async removeItem(token: string, productId: string): Promise<Cart> {
+    const id = await this.cartId(token);
+    await this.db.query(
+      'DELETE FROM carrito_detalle WHERE id_carrito = $1 AND id_producto = $2',
+      [id, Number(productId)]
+    );
+    await this.db.query(
+      'UPDATE carrito SET fecha_actualizacion = NOW() WHERE id_carrito = $1',
+      [id]
+    );
+    return this.getCart(token);
   }
 
-  async clear(cartId: string) {
-    await this.admin.from('cart_items').delete().eq('cart_id', cartId);
+  async clear(token: string) {
+    const id = await this.cartId(token);
+    await this.db.query('DELETE FROM carrito_detalle WHERE id_carrito = $1', [id]);
   }
 
-  async attachUser(cartId: string, userId: string) {
-    await this.admin
-      .from('carts')
-      .update({ user_id: userId, updated_at: new Date().toISOString() })
-      .eq('id', cartId);
+  async attachUser(token: string, userId: string) {
+    await this.db.query(
+      'UPDATE carrito SET id_usuario = $1, fecha_actualizacion = NOW() WHERE token = $2',
+      [Number(userId), token]
+    );
   }
 }

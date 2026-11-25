@@ -1,45 +1,45 @@
 import { CartService } from './cart.service';
+import { DatabaseService } from '../database/database.service';
 
-const admin = { from: jest.fn() } as any;
-const service = new CartService({ admin } as any);
+const db = { query: jest.fn() } as unknown as DatabaseService;
+const service = new CartService(db);
 
 describe('CartService', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('calcula el total desde la BD', async () => {
-    const data = [{
-      cart_id: 'cart1',
-      product_id: 'p1',
-      quantity: 2,
-      products: { name: 'Carne', price_bs: '12.00', active: true, available_today: true }
-    }];
-    admin.from.mockReturnValue({
-      select: () => ({ eq: () => Promise.resolve({ data, error: null }) })
+    (db.query as jest.Mock).mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ id_producto: 1, nombre: 'Carne', cantidad: 2, precio: '12.00' }]
     });
 
-    const cart = await service.getCart('cart1');
+    const cart = await service.getCart('token-1');
 
     expect(cart.items[0].subtotalBs).toBe('24.00');
     expect(cart.totalBs).toBe('24.00');
   });
 
   it('rechaza cantidad menor a 1', async () => {
-    await expect(service.addItem('cart1', 'p1', 0)).rejects.toThrow('Cantidad inválida');
-    expect(admin.from).not.toHaveBeenCalled();
+    await expect(service.addItem('token-1', '1', 0)).rejects.toThrow('Cantidad inválida');
+    expect(db.query).not.toHaveBeenCalled();
   });
 
-  it('responde 409 cuando el producto está agotado', async () => {
-    admin.from.mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          single: () => Promise.resolve({
-            data: { id: 'p1', active: true, available_today: false },
-            error: null
-          })
-        })
-      })
+  it('responde 409 cuando el producto está agotado hoy', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ activo: true, disponible_hoy: false }]
     });
 
-    await expect(service.addItem('cart1', 'p1', 1)).rejects.toMatchObject({ status: 409 });
+    await expect(service.addItem('token-1', '1', 1)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('reutiliza el token de un carrito existente', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ token: 'token-1' }]
+    });
+
+    await expect(service.getOrCreate('token-1')).resolves.toBe('token-1');
+    expect((db.query as jest.Mock).mock.calls[0][1]).toEqual(['token-1']);
   });
 });

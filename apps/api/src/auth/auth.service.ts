@@ -1,48 +1,70 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException
+} from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
 import { Response } from 'express';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
+import { env } from '../config/env';
 import { CookieService } from '../common/cookies/cookie.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
+interface UserRow {
+  id_usuario: number;
+  correo: string;
+  nombre: string;
+  celular: string | null;
+  role: string;
+}
+
 @Injectable()
 export class AuthService {
-  constructor(private sb: SupabaseService, private cookies: CookieService) {}
+  constructor(private db: DatabaseService, private cookies: CookieService) {}
 
   async register(dto: RegisterDto) {
-    const { data, error } = await this.sb.anon.auth.signUp({
-      email: dto.email,
-      password: dto.password
-    });
-    if (error || !data.user) throw new Error(error?.message ?? 'REGISTER_FAILED');
+    const existing = await this.db.query('SELECT 1 FROM usuario WHERE lower(correo) = lower($1)', [
+      dto.email
+    ]);
+    if (existing.rowCount) throw new ConflictException('Ese correo ya está registrado');
 
-    const { data: profile, error: profileError } = await this.sb.admin
-      .from('profiles')
-      .insert({ id: data.user.id, name: dto.name, phone: dto.phone, role: 'CLIENTE' })
-      .select()
-      .single();
-    if (profileError) throw new Error(profileError.message);
+    const role = await this.db.query<{ id_rol: number }>(
+      'SELECT id_rol FROM rol WHERE nombre = $1',
+      ['CLIENTE']
+    );
+    if (!role.rowCount) throw new Error('ROL_CLIENTE_MISSING');
 
-    return this.toUser(data.user.id, data.user.email!, profile);
+    const hash = await bcrypt.hash(dto.password, 10);
+    const inserted = await this.db.query<{ id_usuario: number }>(
+      `INSERT INTO usuario (id_rol, nombre, celular, correo, password_hash, activo)
+       VALUES ($1, $2, $3, $4, $5, TRUE)
+       RETURNING id_usuario`,
+      [role.rows[0].id_rol, dto.name, dto.phone, dto.email, hash]
+    );
+    return this.hydrate(inserted.rows[0].id_usuario);
   }
 
   async login(dto: LoginDto, res: Response) {
-    const { data, error } = await this.sb.anon.auth.signInWithPassword({
-      email: dto.email,
-      password: dto.password
-    });
-    if (error || !data.session || !data.user) {
+    const result = await this.db.query<UserRow & { password_hash: string }>(
+      `SELECT u.id_usuario, u.correo, u.nombre, u.celular, r.nombre AS role, u.password_hash
+       FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
+       WHERE lower(u.correo) = lower($1) AND u.activo = TRUE`,
+      [dto.email]
+    );
+    const user = result.rows[0];
+    if (!user || !(await bcrypt.compare(dto.password, user.password_hash))) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    this.cookies.setSession(
-      res,
-      data.session.access_token,
-      data.session.refresh_token,
-      dto.remember ?? false
-    );
-    return this.hydrate(data.user.id, data.user.email!);
+    const expiresIn = (dto.remember ? `${env.refreshDays}d` : '1d') as jwt.SignOptions['expiresIn'];
+    const token = jwt.sign({ sub: String(user.id_usuario), email: user.correo }, env.jwtSecret, {
+      expiresIn
+    });
+    this.cookies.setSession(res, token, dto.remember ?? false);
+    return this.toUser(user);
   }
 
   logout(res: Response) {
@@ -50,53 +72,45 @@ export class AuthService {
     return { ok: true };
   }
 
-  async me(access?: string, refresh?: string, res?: Response) {
-    if (access) {
-      const { data, error } = await this.sb.anon.auth.getUser(access);
-      if (!error && data?.user) return this.hydrate(data.user.id, data.user.email!);
+  async me(access?: string) {
+    if (!access) throw new UnauthorizedException();
+    let payload: jwt.JwtPayload;
+    try {
+      payload = jwt.verify(access, env.jwtSecret) as jwt.JwtPayload;
+    } catch {
+      throw new UnauthorizedException();
     }
-
-    if (!refresh || !res) throw new UnauthorizedException();
-    const { data, error } = await this.sb.anon.auth.refreshSession({
-      refresh_token: refresh
-    });
-    if (error || !data?.session) throw new UnauthorizedException();
-    const token = data.session.access_token;
-    this.cookies.setSession(res, token, data.session.refresh_token, true);
-
-    const { data: userData, error: userError } = await this.sb.anon.auth.getUser(token);
-    if (userError || !userData?.user) throw new UnauthorizedException();
-    return this.hydrate(userData.user.id, userData.user.email!);
+    if (!payload.sub) throw new UnauthorizedException();
+    return this.hydrate(Number(payload.sub));
   }
 
   async updateName(access: string | undefined, dto: UpdateProfileDto) {
     const user = await this.me(access);
-    const { data, error } = await this.sb.admin
-      .from('profiles')
-      .update({ name: dto.name })
-      .eq('id', user.id)
-      .select()
-      .single();
-    if (error) throw new Error(error.message);
-    return { ...user, name: data.name };
+    await this.db.query('UPDATE usuario SET nombre = $1 WHERE id_usuario = $2', [
+      dto.name,
+      Number(user.id)
+    ]);
+    return { ...user, name: dto.name };
   }
 
-  private async hydrate(id: string, email: string) {
-    const { data } = await this.sb.admin
-      .from('profiles')
-      .select('name,phone,role')
-      .eq('id', id)
-      .single();
-    return this.toUser(id, email, data);
+  private async hydrate(id: number) {
+    const result = await this.db.query<UserRow>(
+      `SELECT u.id_usuario, u.correo, u.nombre, u.celular, r.nombre AS role
+       FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
+       WHERE u.id_usuario = $1 AND u.activo = TRUE`,
+      [id]
+    );
+    if (!result.rowCount) throw new UnauthorizedException();
+    return this.toUser(result.rows[0]);
   }
 
-  private toUser(id: string, email: string, profile: any) {
+  private toUser(row: UserRow) {
     return {
-      id,
-      email,
-      name: profile?.name ?? '',
-      phone: profile?.phone ?? '',
-      role: profile?.role ?? 'CLIENTE'
+      id: String(row.id_usuario),
+      email: row.correo,
+      name: row.nombre,
+      phone: row.celular ?? '',
+      role: row.role
     };
   }
 }

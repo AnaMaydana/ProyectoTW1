@@ -16,9 +16,9 @@ export class AuthController {
   ) {}
 
   private async attachCart(req: Request, res: Response, userId: string) {
-    const cartId = await this.cart.getOrCreate(this.cookies.read(req, 'cart_id'), userId);
-    await this.cart.attachUser(cartId, userId);
-    this.cookies.setCart(res, cartId);
+    const token = await this.cart.getOrCreate(this.cookies.read(req, 'cart_id'), userId);
+    await this.cart.attachUser(token, userId);
+    this.cookies.setCart(res, token);
   }
 
   @Post('register')
@@ -44,11 +44,7 @@ export class AuthController {
   @Get('me')
   async me(@Req() req: Request, @Res() res: Response) {
     res.json(
-      await this.auth.me(
-        this.cookies.read(req, 'sb_access'),
-        this.cookies.read(req, 'sb_refresh'),
-        res
-      )
+      await this.auth.me(this.cookies.read(req, 'sb_access'))
     );
   }
 

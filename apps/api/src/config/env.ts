@@ -1,12 +1,11 @@
 export function loadEnv() {
-  const required = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'];
+  const required = ['DATABASE_URL', 'JWT_SECRET'];
   for (const key of required) {
     if (!process.env[key]) throw new Error(`Falta ${key}`);
   }
   return {
-    supabaseUrl: process.env.SUPABASE_URL!,
-    anonKey: process.env.SUPABASE_ANON_KEY!,
-    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    databaseUrl: process.env.DATABASE_URL!,
+    jwtSecret: process.env.JWT_SECRET!,
     corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     cartDays: Number(process.env.CART_COOKIE_DAYS ?? 30),
     refreshDays: Number(process.env.SESSION_REFRESH_DAYS ?? 30)

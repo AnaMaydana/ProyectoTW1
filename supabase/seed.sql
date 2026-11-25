@@ -1,14 +1,27 @@
-insert into categories (id,name) values
-  ('11111111-1111-4111-8111-111111111111','salteñas'),
-  ('22222222-2222-4222-8222-222222222222','bebidas')
-on conflict (id) do nothing;
+-- Seed adaptado al modelo lógico saltenanga (INT / nombres en español).
+-- Las categorías ya fueron insertadas por saltenanga_schema_adaptado.sql.
 
-insert into products (id,category_id,name,description,price_bs,image_url,available_today) values
-  ('a1000000-0000-4000-8000-000000000001','11111111-1111-4111-8111-111111111111','Carne','Salteña de carne con ají',12.00,'https://placehold.co/600x400?text=Carne',true),
-  ('a1000000-0000-4000-8000-000000000002','11111111-1111-4111-8111-111111111111','Pollo','Salteña de pollo',11.00,'https://placehold.co/600x400?text=Pollo',true),
-  ('a1000000-0000-4000-8000-000000000003','11111111-1111-4111-8111-111111111111','Mixta','Carne y pollo',13.00,'https://placehold.co/600x400?text=Mixta',true),
-  ('a1000000-0000-4000-8000-000000000004','11111111-1111-4111-8111-111111111111','Queso','Salteña de queso',10.00,'https://placehold.co/600x400?text=Queso',false),
-  ('a1000000-0000-4000-8000-000000000005','11111111-1111-4111-8111-111111111111','Vegetariana','Verduras y queso',10.50,'https://placehold.co/600x400?text=Vegetariana',true),
-  ('b1000000-0000-4000-8000-000000000001','22222222-2222-4222-8222-222222222222','Coca Cola','Botella 1.5 L',8.00,'https://placehold.co/600x400?text=Coca',true),
-  ('b1000000-0000-4000-8000-000000000002','22222222-2222-4222-8222-222222222222','Agua','Botella 500 ml',4.00,'https://placehold.co/600x400?text=Agua',true)
-on conflict (id) do nothing;
+INSERT INTO producto (id_categoria, nombre, descripcion, precio, foto_url, activo)
+SELECT c.id_categoria, v.nombre, v.descripcion, v.precio, v.foto_url, TRUE
+FROM categoria c
+CROSS JOIN (VALUES
+  ('Salteñas', 'Carne', 'Salteña de carne con ají', 12.00::numeric, 'https://placehold.co/600x400?text=Carne'),
+  ('Salteñas', 'Pollo', 'Salteña de pollo', 11.00::numeric, 'https://placehold.co/600x400?text=Pollo'),
+  ('Salteñas', 'Mixta', 'Carne y pollo', 13.00::numeric, 'https://placehold.co/600x400?text=Mixta'),
+  ('Salteñas', 'Queso', 'Salteña de queso', 10.00::numeric, 'https://placehold.co/600x400?text=Queso'),
+  ('Salteñas', 'Vegetariana', 'Verduras y queso', 10.50::numeric, 'https://placehold.co/600x400?text=Vegetariana'),
+  ('Bebidas', 'Coca Cola', 'Botella 1.5 L', 8.00::numeric, 'https://placehold.co/600x400?text=Coca'),
+  ('Bebidas', 'Agua', 'Botella 500 ml', 4.00::numeric, 'https://placehold.co/600x400?text=Agua')
+) AS v(categoria, nombre, descripcion, precio, foto_url)
+WHERE c.nombre = v.categoria
+  AND NOT EXISTS (SELECT 1 FROM producto p WHERE p.nombre = v.nombre);
+
+INSERT INTO inventario (id_producto, stock, disponible, disponible_hoy)
+SELECT p.id_producto, 20, TRUE, TRUE
+FROM producto p
+WHERE p.nombre IN ('Carne','Pollo','Mixta','Queso','Vegetariana','Coca Cola','Agua')
+  AND NOT EXISTS (SELECT 1 FROM inventario i WHERE i.id_producto = p.id_producto);
+
+UPDATE inventario
+SET disponible_hoy = FALSE
+WHERE id_producto IN (SELECT id_producto FROM producto WHERE nombre = 'Queso');
