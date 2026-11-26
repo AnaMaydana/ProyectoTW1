@@ -35,4 +35,23 @@ describe('api', () => {
 
     await expect(api('/products')).resolves.toEqual({ ok: true });
   });
+
+  it('usa la base relativa /api sin duplicar barras', async () => {
+    const anterior = process.env.NEXT_PUBLIC_API_URL;
+    process.env.NEXT_PUBLIC_API_URL = '/api';
+    jest.resetModules();
+    const { api: apiRelativa } = require('./api') as typeof import('./api');
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true })
+    }) as any;
+
+    await apiRelativa('/products');
+
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('/api/products');
+    if (anterior === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+    else process.env.NEXT_PUBLIC_API_URL = anterior;
+    jest.resetModules();
+  });
 });
