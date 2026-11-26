@@ -1,6 +1,41 @@
 export type Role = 'CLIENTE' | 'CAJERO' | 'ADMIN';
 export type PaymentMethod = 'EFECTIVO' | 'QR' | 'TRANSFERENCIA';
-export type OrderStatus = 'PENDIENTE' | 'CONFIRMADO' | 'CANCELADO' | 'ENTREGADO';
+export type OrderStatus =
+  | 'PENDIENTE' | 'CONFIRMADO' | 'PREPARANDO' | 'LISTO' | 'ENTREGADO' | 'CANCELADO';
+
+export interface Comprobante {
+  numero: string;
+  fechaEmision: string;
+}
+
+export interface PublicOrder {
+  code: string;
+  status: OrderStatus;
+  totalBs: string;
+  pickupTime: string;
+  items: Array<{ name: string; quantity: number; unitPriceBs: string }>;
+  comprobante: Comprobante | null;
+}
+
+export interface CashierOrder {
+  id: string;
+  code: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  pickupTime: string;
+  status: OrderStatus;
+  totalBs: string;
+  paymentMethod: PaymentMethod;
+  expiresAt: string;
+  createdAt: string;
+  itemCount: number;
+}
+
+export interface CashierOrderDetail extends CashierOrder {
+  notes: string | null;
+  items: Array<{ productId: string; name: string; quantity: number; unitPriceBs: string }>;
+  comprobante: Comprobante | null;
+}
 
 export interface Product {
   id: string;
@@ -44,6 +79,7 @@ export interface Order {
   paymentMethod: PaymentMethod;
   expiresAt: string;
   createdAt: string;
+  comprobante?: Comprobante | null;
   items: Array<{
     productId: string;
     name: string;
