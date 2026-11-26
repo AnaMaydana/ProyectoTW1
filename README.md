@@ -69,6 +69,16 @@ npm -w apps/api run start:dev
 npm -w apps/web run dev
 ```
 
+### Crear el primer administrador
+
+Con `ADMIN_EMAIL` y `ADMIN_PASSWORD` definidos en `.env`:
+
+```bash
+node --env-file=.env scripts/create-admin.mjs
+```
+
+El script es idempotente: si el correo ya existe, lo promueve a ADMIN. Después iniciá sesión con ese correo y vas a ver el enlace "Administración" en la navegación.
+
 ## Reglas de negocio
 
 - Horario de atención: **06:00–11:00** (América/La_Paz).
