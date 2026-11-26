@@ -117,6 +117,8 @@ $env:E2E_FIXED_NOW = '2026-11-25T14:00:00.000Z'
 npm -w apps/web run e2e
 ```
 
+Con Docker, esa variable debe estar en `.env` al recrear el contenedor `api` (las variables del host no se propagan). Después de la corrida, quitá la línea y recreá `api` para volver a la hora real.
+
 ## Fases pendientes
 
 - Fase 2: panel del cajero, realtime, cambio de estados y entrega.
