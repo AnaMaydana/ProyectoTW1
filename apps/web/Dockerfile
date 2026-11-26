@@ -24,7 +24,7 @@ COPY --from=deps /app/node_modules ./node_modules
 RUN npm prune --omit=dev && chown -R node:node /app
 COPY --from=build /app/apps/web/.next ./apps/web/.next
 COPY --from=build /app/apps/web/public ./apps/web/public
-COPY --from=build /app/apps/web/next.config.ts ./apps/web/next.config.ts
+COPY --from=build /app/apps/web/next.config.js ./apps/web/next.config.js
 USER node
 WORKDIR /app/apps/web
 EXPOSE 3000

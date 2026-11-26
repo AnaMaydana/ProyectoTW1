@@ -321,7 +321,7 @@ COPY --from=deps /app/node_modules ./node_modules
 RUN npm prune --omit=dev && chown -R node:node /app
 COPY --from=build /app/apps/web/.next ./apps/web/.next
 COPY --from=build /app/apps/web/public ./apps/web/public
-COPY --from=build /app/apps/web/next.config.ts ./apps/web/next.config.ts
+COPY --from=build /app/apps/web/next.config.js ./apps/web/next.config.js
 USER node
 WORKDIR /app/apps/web
 EXPOSE 3000
@@ -329,6 +329,8 @@ CMD ["npm", "run", "start"]
 ```
 
 `NEXT_PUBLIC_API_URL` se incrusta en el build de Next; el default del `ARG` solo sirve para builds sueltos y Compose siempre pasa `https://${DOMAIN:-localhost}/api`.
+
+**Corrección aplicada durante la verificación:** la configuración se renombró de `next.config.ts` a `next.config.js`. `next start` relee el archivo de configuración en runtime; con `next.config.ts` y `npm prune --omit=dev`, Next no encontraba `typescript` e intentaba instalarlo con yarn al arrancar, haciendo fallar el healthcheck por timeout. El `next.config.js` equivalente no requiere TypeScript en la imagen de runtime.
 
 ### Paso 4: verificación de la tarea
 
