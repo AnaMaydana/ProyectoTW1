@@ -22,3 +22,9 @@ export function lowStockThreshold(): number {
   const value = Number(process.env.LOW_STOCK_THRESHOLD ?? 5);
   return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 5;
 }
+
+/** Puerto de escucha: Render inyecta PORT; en local se usa API_PORT o 3001. */
+export function apiPort(): number {
+  const value = Number(process.env.PORT || process.env.API_PORT || 3001);
+  return Number.isFinite(value) && value > 0 && value <= 65535 ? Math.floor(value) : 3001;
+}

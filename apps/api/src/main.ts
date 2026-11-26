@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
-import { env } from './config/env';
+import { env, apiPort } from './config/env';
 import { spanishValidationFactory } from './common/validation/spanish-validation';
 
 async function bootstrap() {
@@ -14,6 +14,6 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true, transform: true, exceptionFactory: spanishValidationFactory
   }));
-  await app.listen(3001);
+  await app.listen(apiPort());
 }
 bootstrap();
