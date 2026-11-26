@@ -3,6 +3,11 @@
   "private": true,
   "version": "1.0.0",
   "workspaces": ["apps/api", "apps/web"],
+  "scripts": {
+    "build": "npm -w apps/web run build",
+    "dev": "npm -w apps/web run dev",
+    "start": "npm -w apps/web run start"
+  },
   "devDependencies": {
     "pg": "^8.13.0"
   }
