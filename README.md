@@ -136,6 +136,51 @@ La API responde 502 si el upstream está caído. Los healthchecks solo informan 
 
 Para probar el stack HTTPS en local, usar `DOMAIN=localhost`: Caddy usa su CA interna y `curl -k` acepta el certificado. Los E2E contra `https://localhost` usan `E2E_BASE_URL=https://localhost` y el overlay `deploy/docker-compose.e2e.yml`, que solo habilita el reloj fijo E2E; **no usarlo en producción**.
 
+## Despliegue híbrido (Vercel + VPS)
+
+La web se sirve desde Vercel en `https://www.$DOMAIN`; la API sigue en el VPS, detrás de Caddy, en `https://$DOMAIN/api`. Ambos comparten dominio raíz, así que las cookies `cart_id` y `sb_access` (host-only de `$DOMAIN`, `httpOnly`, `sameSite=lax`, `secure` en producción) siguen enviándose sin cambiar a `sameSite=none`.
+
+### DNS
+
+- `$DOMAIN` → registro **A** a la IP del VPS. Caddy termina el TLS del API y sigue enrutando solo `/api/*`.
+- `www.$DOMAIN` → **CNAME** a `cname.vercel-dns.com`. Vercel termina el TLS de la web.
+
+### Variables
+
+- En el VPS, en `.env`: `DOMAIN=tu-dominio.com` (sin `https://` ni barra final) y `WEB_ORIGIN=https://www.tu-dominio.com`. Recrear la API con `docker compose up -d --build api`. Sin `WEB_ORIGIN`, la API acepta solo `https://$DOMAIN` (modo Fase 5).
+- En el proyecto de Vercel: `NEXT_PUBLIC_API_URL=https://tu-dominio.com/api`. Se incrusta en el bundle durante el build; cambiarlo exige un redeploy.
+- `VERCEL_TOKEN` se usa solo en el entorno del operador: nunca se guarda en el repo ni se muestra en logs.
+
+### Despliegue
+
+Desde la raíz del repo, con `VERCEL_TOKEN` ya exportado en el entorno:
+
+```powershell
+npm install
+npx vercel@latest whoami
+'https://tu-dominio.com/api' | npx vercel@latest env add NEXT_PUBLIC_API_URL production --yes
+npx vercel@latest deploy --prod --yes
+npx vercel@latest domains add www.tu-dominio.com --yes
+npx vercel@latest alias set <url-del-deployment> www.tu-dominio.com
+```
+
+La primera vez, `deploy` crea el proyecto; para un proyecto ya existente se puede usar `npx vercel@latest link --yes` antes. Reemplazar `<url-del-deployment>` por la URL que imprime `deploy`.
+
+### Verificación
+
+```bash
+curl -I https://www.tu-dominio.com/menu       # 200, servido por Vercel
+curl -i https://tu-dominio.com/api/health     # 200, {"status":"ok",...}, servido por Caddy
+```
+
+En el navegador, en `https://www.tu-dominio.com`: registro, carrito persistente al cerrar y checkout. Las peticiones a `/api/*` deben responder 200 y la cookie `cart_id` debe llegar a la API. Si aparece error de CORS, revisar `docker compose config` en el VPS (la variable `CORS_ORIGIN` del servicio `api` debe ser `https://www.tu-dominio.com`) y reiniciar con `docker compose restart api`.
+
+Fuera del horario 06:00–11:00 de America/La_Paz se verifica solo el humo HTTP: el reloj fijo `E2E_FIXED_NOW` es exclusivo de pruebas locales y se ignora en producción.
+
+### Rollback
+
+Para volver a la web anterior: promover un deployment previo desde el dashboard de Vercel («Promote») o `npx vercel@latest rollback <url-del-deployment-anterior>`. El VPS y la base no se tocan, así que no hay migración inversa. Si el problema está en la API, volver al commit conocido en el VPS y ejecutar `docker compose up -d --build`.
+
 ## Pruebas
 
 ```bash
