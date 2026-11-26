@@ -15,7 +15,7 @@ class RealDateConstraint implements ValidatorConstraintInterface {
   }
 }
 
-function IsRealDate(options?: ValidationOptions) {
+export function IsRealDate(options?: ValidationOptions) {
   return (object: Object, propertyName: string) => {
     registerDecorator({
       target: object.constructor as Function, propertyName, options,
