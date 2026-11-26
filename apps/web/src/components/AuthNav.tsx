@@ -21,6 +21,7 @@ export function AuthNav() {
     <>
       <a href="/profile">Mi perfil</a>
       {user.role === 'ADMIN' && <a href="/admin">Administración</a>}
+      {(user.role === 'CAJERO' || user.role === 'ADMIN') && <a href="/cashier">Cajero</a>}
       <button onClick={logout}>Cerrar sesión</button>
     </>
   ) : (

@@ -56,4 +56,10 @@ describe('AuthNav', () => {
     render(<AuthNav />);
     expect(await screen.findByRole('link', { name: 'Administración' })).toBeInTheDocument();
   });
+
+  it('muestra Cajero para CAJERO y ADMIN', async () => {
+    (api as jest.Mock).mockResolvedValueOnce({ ...user, role: 'CAJERO' });
+    render(<AuthNav />);
+    expect(await screen.findByRole('link', { name: 'Cajero' })).toBeInTheDocument();
+  });
 });

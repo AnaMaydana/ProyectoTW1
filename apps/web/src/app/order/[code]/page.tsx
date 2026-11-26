@@ -2,26 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
-import { Order } from '../../../lib/types';
-import { orderLines, savedOrderMatches } from '../../../lib/order';
+import { PublicOrder } from '../../../lib/types';
 
 export default function OrderConfirmation({ params }: { params: Promise<{ code: string }> }) {
   const [code, setCode] = useState('');
-  const [order, setOrder] = useState<Order | null>(null);
+  const [receipt, setReceipt] = useState<PublicOrder | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     params.then(({ code: value }) => {
       setCode(value);
-      const saved = savedOrderMatches(sessionStorage.getItem('lastOrder'), value);
-      if (saved) {
-        setOrder(saved);
-        setLoading(false);
-        return;
-      }
-      api<{ orders: Order[] }>('/orders')
-        .then((res) => setOrder(res.orders.find((item) => item.code === value) ?? null))
-        .catch(() => setOrder(null))
+      api<{ order: PublicOrder }>(`/orders/code/${encodeURIComponent(value)}`)
+        .then((res) => setReceipt(res.order))
+        .catch(() => setReceipt(null))
         .finally(() => setLoading(false));
     });
   }, [params]);
@@ -29,20 +22,23 @@ export default function OrderConfirmation({ params }: { params: Promise<{ code: 
   return (
     <main>
       <h1>Pedido confirmado</h1>
-      {order ? (
+      {receipt ? (
         <>
-          <p>Código de pedido: <strong>{order.code}</strong></p>
-          <p>Total: Bs {order.totalBs}</p>
-          <p>Hora de recojo: {order.pickupTime}</p>
-          <p>Método de pago: {order.paymentMethod}</p>
+          <p>Código de pedido: <strong>{receipt.code}</strong></p>
+          <p>Total: Bs {receipt.totalBs}</p>
+          <p>Hora de recojo: {receipt.pickupTime}</p>
+          <p>Estado: {receipt.status}</p>
           <ul>
-            {orderLines(order).map((item) => (
-              <li key={item.productId}>
+            {receipt.items.map((item) => (
+              <li key={`${item.name}-${item.quantity}`}>
                 {item.quantity} × {item.name} — Bs {item.unitPriceBs}
               </li>
             ))}
           </ul>
-          <p>Mostrá el código {order.code} en la sucursal.</p>
+          {receipt.comprobante && (
+            <p>Comprobante: <strong>{receipt.comprobante.numero}</strong> — {receipt.comprobante.fechaEmision}</p>
+          )}
+          <p>Mostrá el código {receipt.code} en la sucursal.</p>
         </>
       ) : loading ? (
         <p>Cargando pedido {code}…</p>
