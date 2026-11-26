@@ -98,15 +98,39 @@ export function CashierOrders() {
   return (
     <section>
       {message && <p role="status">{message}</p>}
-      <div>
-        <label htmlFor="cashier-code">Código del pedido (escaneá o escribí)</label>
-        <input id="cashier-code" value={code} onChange={(e) => setCode(e.target.value)} />
-        <button type="button" onClick={() => { void search(); }}>Buscar</button>
+      <div className="cashier-controls">
+        <div className="cashier-search">
+          <label htmlFor="cashier-code">Código del pedido (escaneá o escribí)</label>
+          <div className="cashier-input-group">
+            <input
+              id="cashier-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Ej: SLT-1234"
+            />
+            <button type="button" onClick={() => { void search(); }}>
+              Buscar
+            </button>
+          </div>
+        </div>
+        <div className="cashier-actions">
+          {selected?.status === 'LISTO' && selected.code === normalizedCode && (
+            <button
+              type="button"
+              className="btn-action btn-edit"
+              onClick={() => { void deliver(); }}
+            >
+              Confirmar entrega
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => { void refresh(); }}>
+            Actualizar lista
+          </button>
+        </div>
       </div>
-      {selected?.status === 'LISTO' && selected.code === normalizedCode && (
-        <button type="button" onClick={() => { void deliver(); }}>Confirmar entrega</button>
-      )}
-      <button type="button" onClick={() => { void refresh(); }}>Actualizar</button>
       <div className="table-scroll">
         <table>
           <thead>
@@ -123,18 +147,30 @@ export function CashierOrders() {
                 <td>Bs {order.totalBs}</td>
                 <td>{order.paymentMethod}</td>
                 <td>
-                  {NEXT[order.status] && (
-                    <button type="button" onClick={() => {
-                      const next = NEXT[order.status];
-                      if (next) void change(order, next);
-                    }}>
-                      {order.status === 'PENDIENTE' ? 'Confirmar'
-                        : order.status === 'CONFIRMADO' ? 'Preparar' : 'Marcar listo'}
-                    </button>
-                  )}
-                  {(order.status === 'PENDIENTE' || order.status === 'CONFIRMADO') && (
-                    <button type="button" onClick={() => { void cancel(order); }}>Cancelar</button>
-                  )}
+                  <div className="table-actions">
+                    {NEXT[order.status] && (
+                      <button
+                        type="button"
+                        className="btn-action btn-edit"
+                        onClick={() => {
+                          const next = NEXT[order.status];
+                          if (next) void change(order, next);
+                        }}
+                      >
+                        {order.status === 'PENDIENTE' ? 'Confirmar'
+                          : order.status === 'CONFIRMADO' ? 'Preparar' : 'Marcar listo'}
+                      </button>
+                    )}
+                    {(order.status === 'PENDIENTE' || order.status === 'CONFIRMADO') && (
+                      <button
+                        type="button"
+                        className="btn-action btn-delete"
+                        onClick={() => { void cancel(order); }}
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

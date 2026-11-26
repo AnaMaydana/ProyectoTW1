@@ -164,35 +164,59 @@ export default function AdminProducts() {
             </div>
           )}
         </div>
-        <button type="submit">{editing ? 'Guardar cambios' : 'Crear producto'}</button>
-        {editing && (
-          <button
-            type="button"
-            style={{ marginLeft: '0.5rem' }}
-            onClick={() => { setEditing(null); setForm(empty); setFotoOriginal(null); setUltimaSubida(null); }}
-          >
-            Cancelar edición
-          </button>
-        )}
+        <div className="form-actions">
+          <button type="submit">{editing ? 'Guardar cambios' : 'Crear producto'}</button>
+          {editing && (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => { setEditing(null); setForm(empty); setFotoOriginal(null); setUltimaSubida(null); }}
+            >
+              Cancelar edición
+            </button>
+          )}
+        </div>
       </form>
       {error && <p role="alert">{error}</p>}
       <div className="table-scroll">
       <table>
-        <thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Estado</th><th></th></tr></thead>
+        <thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr></thead>
         <tbody>
           {products.map((p) => (
             <tr key={p.id}>
               <td>{p.nombre}</td><td>{p.categoria}</td><td>Bs {p.precio}</td>
               <td>{p.stock}</td><td>{p.activo ? (p.disponibleHoy ? 'Disponible' : 'Sin stock del día') : 'Inactivo'}</td>
               <td>
-                <button onClick={() => {
-                  setEditing(p.id);
-                  setForm({ idCategoria: p.idCategoria, nombre: p.nombre, precio: p.precio, stock: String(p.stock), fotoUrl: p.fotoUrl });
-                  setFotoOriginal(p.fotoUrl);
-                  setUltimaSubida(null);
-                }}>Editar</button>{' '}
-                {p.activo && <button onClick={() => deactivate(p)}>Desactivar</button>}{' '}
-                <button onClick={() => deleteProduct(p)}>Eliminar</button>
+                <div className="table-actions">
+                  <button
+                    type="button"
+                    className="btn-action btn-edit"
+                    onClick={() => {
+                      setEditing(p.id);
+                      setForm({ idCategoria: p.idCategoria, nombre: p.nombre, precio: p.precio, stock: String(p.stock), fotoUrl: p.fotoUrl });
+                      setFotoOriginal(p.fotoUrl);
+                      setUltimaSubida(null);
+                    }}
+                  >
+                    Editar
+                  </button>
+                  {p.activo && (
+                    <button
+                      type="button"
+                      className="btn-action btn-deactivate"
+                      onClick={() => deactivate(p)}
+                    >
+                      Desactivar
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-action btn-delete"
+                    onClick={() => deleteProduct(p)}
+                  >
+                    Eliminar
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

@@ -44,16 +44,38 @@ export default function AdminCategories() {
   return (
     <section>
       <h1>Categorías</h1>
-      <form onSubmit={submit}>
-        <label>Nombre<input value={nombre} onChange={(e) => setNombre(e.target.value)} required /></label>
-        <button type="submit">Crear categoría</button>
+      <form onSubmit={submit} className="category-form">
+        <label>
+          Nombre
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Ej: Tradicionales"
+            required
+          />
+        </label>
+        <div className="form-actions">
+          <button type="submit">Crear categoría</button>
+        </div>
       </form>
-      {error && <p role="alert">{error}</p>}
-      <ul>
+      {error && <p role="alert" className="alert">{error}</p>}
+      <ul className="category-list">
         {categories.map((c) => (
-          <li key={c.id}>
-            {c.nombre} — {c.productCount} productos — {c.activa ? 'Activa' : 'Inactiva'}
-            <button onClick={() => toggle(c)}>{c.activa ? 'Desactivar' : 'Activar'}</button>
+          <li key={c.id} className="category-item card">
+            <div>
+              <strong>{c.nombre}</strong>
+              <span className="category-meta">{c.productCount} productos</span>
+              <span className="badge">{c.activa ? 'Activa' : 'Inactiva'}</span>
+            </div>
+            <div className="table-actions">
+              <button
+                type="button"
+                className={`btn-action ${c.activa ? 'btn-deactivate' : 'btn-edit'}`}
+                onClick={() => toggle(c)}
+              >
+                {c.activa ? 'Desactivar' : 'Activar'}
+              </button>
+            </div>
           </li>
         ))}
       </ul>

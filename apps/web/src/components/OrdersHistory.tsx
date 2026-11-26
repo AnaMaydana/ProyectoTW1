@@ -51,21 +51,35 @@ export function OrdersHistory({
 
   return (
     <>
-      <ul>
+      <ul className="orders-list">
         {initialOrders.map((order) => {
           const expired = new Date(order.expiresAt).getTime() <= Date.now();
           const cancellable = order.status === 'PENDIENTE' && !expired;
           return (
-            <li key={order.id} className="card">
+            <li key={order.id} className="card order-card">
               <p>Código: <strong>{order.code}</strong></p>
-              <p>Total: Bs {order.totalBs} — Estado: {order.status}</p>
+              <p>Total: Bs {order.totalBs} — Estado: <span className="badge">{order.status}</span></p>
               <p>Recojo: {order.pickupTime}</p>
-              <button onClick={() => repeat(order)}>Repetir</button>{' '}
-              {cancellable ? (
-                <button onClick={() => cancel(order)}>Cancelar</button>
-              ) : (
-                <span>Si necesitás cancelar, llamá al local</span>
-              )}
+              <div className="order-actions">
+                <button
+                  type="button"
+                  className="btn-action btn-edit"
+                  onClick={() => repeat(order)}
+                >
+                  Repetir
+                </button>
+                {cancellable ? (
+                  <button
+                    type="button"
+                    className="btn-action btn-delete"
+                    onClick={() => cancel(order)}
+                  >
+                    Cancelar
+                  </button>
+                ) : (
+                  <span className="order-note">Si necesitás cancelar, llamá al local</span>
+                )}
+              </div>
             </li>
           );
         })}

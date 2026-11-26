@@ -73,9 +73,17 @@ export default function AdminInventory() {
                   onBlur={(e) => saveStock(item, e.target.value)} />
               </td>
               <td>{item.disponibleHoy ? 'Sí' : 'No'}</td>
-              <td><button onClick={() => toggle(item)}>
-                {item.disponibleHoy ? 'Marcar agotado' : 'Marcar disponible'}
-              </button></td>
+              <td>
+                <div className="table-actions">
+                  <button
+                    type="button"
+                    className={`btn-action ${item.disponibleHoy ? 'btn-deactivate' : 'btn-edit'}`}
+                    onClick={() => toggle(item)}
+                  >
+                    {item.disponibleHoy ? 'Marcar agotado' : 'Marcar disponible'}
+                  </button>
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>

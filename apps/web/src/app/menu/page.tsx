@@ -27,10 +27,10 @@ export default async function Menu({
   return (
     <main>
       <h1>Menú</h1>
-      <form method="get">
+      <form method="get" className="menu-search-form">
         <label>
           Buscar
-          <input name="search" defaultValue={search} placeholder="Buscar salteña" />
+          <input name="search" defaultValue={search} placeholder="Buscar salteña..." />
         </label>
         <label>
           Categoría
