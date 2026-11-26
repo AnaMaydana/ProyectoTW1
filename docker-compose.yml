@@ -36,7 +36,7 @@ services:
       DOMAIN: ${DOMAIN:-localhost}
       API_INTERNAL_URL: http://api:3001
       NEXT_PUBLIC_API_URL: https://${DOMAIN:-localhost}/api
-      CORS_ORIGIN: https://${DOMAIN:-localhost}
+      CORS_ORIGIN: ${WEB_ORIGIN:-https://${DOMAIN:-localhost}}
     depends_on:
       api:
         condition: service_healthy
@@ -57,7 +57,7 @@ services:
     environment:
       NODE_ENV: production
       DOMAIN: ${DOMAIN:-localhost}
-      CORS_ORIGIN: https://${DOMAIN:-localhost}
+      CORS_ORIGIN: ${WEB_ORIGIN:-https://${DOMAIN:-localhost}}
       API_INTERNAL_URL: http://api:3001
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]

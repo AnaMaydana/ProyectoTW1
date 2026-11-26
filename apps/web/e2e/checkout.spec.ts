@@ -24,10 +24,12 @@ test('pedido en 5 pasos, sesión y carrito persistentes', async ({ page, browser
   await page.waitForLoadState('networkidle');
 
   await page.getByRole('button', { name: 'Agregar' }).first().click();
-  // Esperar a que el carrito deje de estar vacío: `toBeVisible()` con
-  // /Total: Bs/ también coincide con "Total: Bs 0.00" y puede capturar el
-  // storageState antes de que la API cree la cookie `cart_id`.
-  await expect(page.getByText(/Total: Bs/).first()).not.toHaveText(/^Total: Bs 0\.00$/);
+  // El detalle ya no está al final de la página: se abre desde el icono de la
+  // cabecera. Esperar al contador evita capturar el storageState antes de que
+  // la API cree la cookie `cart_id`.
+  await expect(page.getByRole('button', { name: /Abrir carrito/i })).toHaveText('1');
+  await page.getByRole('button', { name: /Abrir carrito/i }).click();
+  await expect(page.getByText(/Total: Bs/)).not.toHaveText(/^Total: Bs 0\.00$/);
 
   const state = await page.context().storageState();
   const viewport = page.viewportSize() ?? undefined;
@@ -37,7 +39,8 @@ test('pedido en 5 pasos, sesión y carrito persistentes', async ({ page, browser
   const context2 = await browser.newContext({ storageState: state, viewport, ignoreHTTPSErrors });
   const page2 = await context2.newPage();
   await page2.goto('/menu', { waitUntil: 'networkidle' });
-  await expect(page2.getByText(/Total: Bs 0\.00/)).not.toBeVisible();
+  await page2.getByRole('button', { name: /Abrir carrito/i }).click();
+  await expect(page2.getByText(/Total: Bs/)).not.toHaveText(/^Total: Bs 0\.00$/);
   await page2.goto('/checkout', { waitUntil: 'networkidle' });
   await page2.getByLabel('Hora de recojo').fill('10:00');
   await page2.getByRole('button', { name: 'Confirmar pedido' }).click();

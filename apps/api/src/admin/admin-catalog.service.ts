@@ -2,11 +2,13 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException
 } from '@nestjs/common';
 import { QueryResultRow } from 'pg';
 import { lowStockThreshold } from '../config/env';
 import { DatabaseService } from '../database/database.service';
+import { PhotoStorageService } from './photo-storage.service';
 
 export interface AdminCategory {
   id: string; nombre: string; activa: boolean; productCount: number;
@@ -23,10 +25,11 @@ export interface AdminInventoryItem {
 }
 export interface CreateProductDtoShape {
   idCategoria: number; nombre: string; descripcion?: string;
-  precio: number; fotoUrl?: string; stock?: number; disponibleHoy?: boolean;
+  precio: number; fotoUrl?: string | null; stock?: number; disponibleHoy?: boolean;
 }
 export interface UpdateProductDtoShape extends Partial<CreateProductDtoShape> {
   activo?: boolean;
+  fotoUrlAnterior?: string | null;
 }
 
 interface CategoryRow {
@@ -58,7 +61,9 @@ const productSelect = `
 
 @Injectable()
 export class AdminCatalogService {
-  constructor(private db: DatabaseService) {}
+  private readonly logger = new Logger(AdminCatalogService.name);
+
+  constructor(private db: DatabaseService, private photos: PhotoStorageService) {}
 
   private async ensureUnique(
     table: 'categoria' | 'producto',
@@ -183,10 +188,12 @@ export class AdminCatalogService {
       `UPDATE producto SET
          id_categoria = COALESCE($2, id_categoria), nombre = COALESCE($3, nombre),
          descripcion = COALESCE($4, descripcion), precio = COALESCE($5, precio),
-         foto_url = COALESCE($6, foto_url), activo = COALESCE($7, activo)
+         foto_url = CASE WHEN $6::boolean THEN $7::text ELSE foto_url END,
+         activo = COALESCE($8, activo)
        WHERE id_producto = $1`,
       [productId, dto.idCategoria ?? null, dto.nombre ?? null, dto.descripcion ?? null,
-       dto.precio === undefined ? null : dto.precio.toFixed(2), dto.fotoUrl ?? null, dto.activo ?? null]
+       dto.precio === undefined ? null : dto.precio.toFixed(2),
+       dto.fotoUrl !== undefined, dto.fotoUrl ?? null, dto.activo ?? null]
     );
 
     if (dto.stock !== undefined) {
@@ -196,7 +203,24 @@ export class AdminCatalogService {
       const value = dto.activo === false ? false : dto.disponibleHoy;
       await this.db.query('UPDATE inventario SET disponible_hoy = $2 WHERE id_producto = $1', [productId, value]);
     }
-    return this.oneProduct(productId);
+    const updated = await this.oneProduct(productId);
+
+    if (
+      dto.fotoUrl !== undefined &&
+      dto.fotoUrlAnterior &&
+      dto.fotoUrlAnterior !== dto.fotoUrl &&
+      this.photos.isManagedUrl(dto.fotoUrlAnterior)
+    ) {
+      try {
+        await this.photos.remove(dto.fotoUrlAnterior);
+      } catch (err) {
+        this.logger.warn(
+          `No se pudo borrar la foto anterior: ${err instanceof Error ? err.message : 'desconocido'}`
+        );
+      }
+    }
+
+    return updated;
   }
 
   async deleteProduct(id: string | number): Promise<{ deleted: boolean; message: string }> {

@@ -8,13 +8,15 @@ import { AdminReportsService } from '../src/admin/admin-reports.service';
 import { RolesGuard } from '../src/common/guards/roles.guard';
 import { AuthService } from '../src/auth/auth.service';
 import { CookieService } from '../src/common/cookies/cookie.service';
+import { PhotoStorageService } from '../src/admin/photo-storage.service';
 
 describe('Admin E2E', () => {
   let app: INestApplication;
   let catalog: Record<string, jest.Mock>;
   let reports: Record<string, jest.Mock>;
+  let photos: Record<string, jest.Mock>;
 
-  const asAdmin = (method: 'get' | 'post' | 'patch', path: string) =>
+  const asAdmin = (method: 'get' | 'post' | 'patch' | 'delete', path: string) =>
     (request(app.getHttpServer()) as any)[method](path).set('Cookie', 'sb_access=admin-token');
 
   beforeAll(async () => {
@@ -25,6 +27,9 @@ describe('Admin E2E', () => {
     };
     reports = {
       sales: jest.fn(), topProducts: jest.fn(), ordersByStatus: jest.fn(), lowStock: jest.fn()
+    };
+    photos = {
+      upload: jest.fn(), remove: jest.fn(), isManagedUrl: jest.fn(), publicUrlPrefix: jest.fn()
     };
     const auth = {
       me: jest.fn((token: string) => Promise.resolve(
@@ -40,6 +45,7 @@ describe('Admin E2E', () => {
         { provide: AdminReportsService, useValue: reports },
         { provide: AuthService, useValue: auth },
         { provide: CookieService, useValue: cookies },
+        { provide: PhotoStorageService, useValue: photos },
         RolesGuard
       ]
     }).compile();
@@ -64,6 +70,11 @@ describe('Admin E2E', () => {
     reports.topProducts.mockResolvedValue([]);
     reports.ordersByStatus.mockResolvedValue([]);
     reports.lowStock.mockResolvedValue([]);
+    photos.upload.mockResolvedValue(
+      'https://demo.supabase.co/storage/v1/object/public/portadas/productos/abc.png'
+    );
+    photos.remove.mockResolvedValue(undefined);
+    photos.isManagedUrl.mockReturnValue(true);
   });
 
   afterEach(() => jest.restoreAllMocks());
@@ -147,6 +158,42 @@ describe('Admin E2E', () => {
     catalog.createCategory.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: '23505' }));
     const res = await asAdmin('post','/admin/categories').send({ nombre: 'Postres' }).expect(409);
     expect(res.body.message).toBe('Nombre duplicado');
+  });
+
+  it('401 y 403 en la subida de fotos', async () => {
+    const body = { fileName: 'foto.png', contentType: 'image/png', base64: 'aW1n' };
+    await request(app.getHttpServer()).post('/admin/products/photo').send(body).expect(401);
+    await request(app.getHttpServer())
+      .post('/admin/products/photo').set('Cookie', 'sb_access=cliente-token').send(body).expect(403);
+  });
+
+  it('ADMIN sube una foto y devuelve la URL', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    const res = await asAdmin('post', '/admin/products/photo')
+      .send({ fileName: 'foto.png', contentType: 'image/png', base64: 'aW1n' })
+      .expect(201);
+    expect(res.body).toEqual({
+      url: 'https://demo.supabase.co/storage/v1/object/public/portadas/productos/abc.png'
+    });
+    expect(photos.upload).toHaveBeenCalledWith('aW1n', 'image/png');
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('subir_foto id_usuario=1'));
+  });
+
+  it('400 si el tipo de foto no está permitido', async () => {
+    const res = await asAdmin('post', '/admin/products/photo')
+      .send({ fileName: 'foto.gif', contentType: 'image/gif', base64: 'aW1n' })
+      .expect(400);
+    expect(res.body.message).toContain('Formato de imagen no permitido (usa JPG, PNG o WebP)');
+  });
+
+  it('ADMIN borra una foto propia', async () => {
+    const res = await asAdmin('delete', '/admin/products/photo')
+      .send({ url: 'https://demo.supabase.co/storage/v1/object/public/portadas/productos/abc.png' })
+      .expect(200);
+    expect(res.body).toEqual({ ok: true });
+    expect(photos.remove).toHaveBeenCalledWith(
+      'https://demo.supabase.co/storage/v1/object/public/portadas/productos/abc.png'
+    );
   });
 
   afterAll(async () => app.close());

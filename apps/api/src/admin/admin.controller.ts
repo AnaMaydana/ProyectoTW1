@@ -11,6 +11,8 @@ import { AdminReportsService } from './admin-reports.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 import { CreateProductDto, UpdateProductDto, UpdateInventoryDto } from './dto/product.dto';
 import { LowStockDto, ReportRangeDto, TopProductsDto } from './dto/report.dto';
+import { DeletePhotoDto, UploadPhotoDto } from './dto/photo.dto';
+import { PhotoStorageService } from './photo-storage.service';
 
 @Controller('admin')
 @UseGuards(RolesGuard)
@@ -21,7 +23,8 @@ export class AdminController {
 
   constructor(
     private catalog: AdminCatalogService,
-    private reports: AdminReportsService
+    private reports: AdminReportsService,
+    private photos: PhotoStorageService
   ) {}
 
   /** Auditoría: solo id_usuario y acción, nunca datos personales. */
@@ -60,6 +63,20 @@ export class AdminController {
     const product = await this.catalog.createProduct(dto);
     this.audit(req, 'crear_producto');
     return { product };
+  }
+
+  @Post('products/photo')
+  async uploadPhoto(@Req() req: Request, @Body() dto: UploadPhotoDto) {
+    const url = await this.photos.upload(dto.base64, dto.contentType);
+    this.audit(req, 'subir_foto');
+    return { url };
+  }
+
+  @Delete('products/photo')
+  async deletePhoto(@Req() req: Request, @Body() dto: DeletePhotoDto) {
+    await this.photos.remove(dto.url);
+    this.audit(req, 'borrar_foto');
+    return { ok: true };
   }
 
   @Patch('products/:id')
