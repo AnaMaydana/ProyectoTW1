@@ -373,7 +373,7 @@ git commit -m "build: Dockerfiles de produccion multi-etapa y .dockerignore"
 }
 ```
 
-No agregar `email {$ACME_EMAIL}`: con el valor vacío Caddy rompe el parseo. `ACME_EMAIL` queda documentado como paso manual opcional. Para `localhost`, Caddy usa su CA interna y no contacta a Let's Encrypt.
+No agregar `email {$ACME_EMAIL}`: el servicio `caddy` no lee `.env` y la directiva quedaría vacía, rompiendo el parseo. Para notificaciones se agrega literalmente `email <correo>`; queda documentado como paso manual opcional. Para `localhost`, Caddy usa su CA interna y no contacta a Let's Encrypt.
 
 ### Paso 2: `docker-compose.yml`
 
@@ -464,9 +464,9 @@ Agregar al final del archivo:
 DOMAIN=localhost
 HTTP_PORT=80
 HTTPS_PORT=443
-# Opcional: si se descomenta, agregar manualmente `email {$ACME_EMAIL}` al bloque
-# global de deploy/Caddyfile para recibir notificaciones de Let's Encrypt.
-# ACME_EMAIL=
+# Opcional: para recibir notificaciones de ACME, agregar literalmente
+# `email tu-correo@ejemplo.com` al bloque global de deploy/Caddyfile.
+# No usar una variable de entorno: el servicio caddy no lee .env.
 ```
 
 No modificar `DATABASE_URL`, `JWT_SECRET`, horarios ni umbrales.
@@ -554,7 +554,7 @@ Requisitos: VPS con Docker y Docker Compose, dominio apuntando a la IP del servi
 
 1. Instalar Docker y el plugin de Compose en el servidor.
 2. Clonar el repositorio y copiar `.env.example` a `.env`. Completar `DATABASE_URL` (session pooler de Supabase), `JWT_SECRET` y definir `DOMAIN=tu-dominio.com` (sin `https://` ni barra final).
-3. Si se quieren notificaciones de ACME, descomentar `ACME_EMAIL` en `.env` y agregar `email {$ACME_EMAIL}` al bloque global de `deploy/Caddyfile` antes de arrancar. Sin correo, Caddy igual emite y renueva el certificado.
+3. Si se quieren notificaciones de ACME, agregar literalmente `email tu-correo@ejemplo.com` al bloque global de `deploy/Caddyfile` antes de arrancar. No usar `{$ACME_EMAIL}`: el servicio `caddy` no lee `.env` y la directiva quedaría vacía. Sin correo, Caddy igual emite y renueva el certificado.
 4. Arrancar:
 
    ```bash
@@ -581,9 +581,9 @@ docker compose restart api
 docker compose down            # conserva caddy_data y caddy_config
 ```
 
-Si `DOMAIN` cambia, hay que reconstruir `web`: `NEXT_PUBLIC_API_URL` se incrusta en el bundle de Next en build time (`docker compose up -d --build web`). El servidor de Next llama a la API por `API_INTERNAL_URL=http://api:3001` en runtime, sin exponer el puerto 3001.
+Si `DOMAIN` cambia, hay que reconstruir todos los servicios (`docker compose up -d --build`): `NEXT_PUBLIC_API_URL` se incrusta en el bundle de Next en build time y Caddy lee el dominio al arrancar. Reconstruir solo `web` dejaría a Caddy sirviendo el dominio anterior. El volumen `caddy_data` conserva el certificado viejo hasta que Caddy obtiene el nuevo. El servidor de Next llama a la API por `API_INTERNAL_URL=http://api:3001` en runtime, sin exponer el puerto 3001.
 
-La API responde 502 si el upstream está caído: el healthcheck reinicia el contenedor, pero no reescribe el proxy en caliente. `/health` es un liveness check (no consulta Supabase), así que una caída del proveedor externo no dispara reinicios en cascada.
+La API responde 502 si el upstream está caído. Los healthchecks solo informan del estado y ordenan el arranque (`depends_on` con `service_healthy`): Docker **no** reinicia contenedores `unhealthy` por sí solo; `restart: unless-stopped` actúa solo si el proceso termina. Para recuperar un contenedor marcado como unhealthy, reiniciarlo manualmente (`docker compose restart <servicio>`). `/health` es un liveness check (no consulta Supabase), así que una caída del proveedor externo no dispara reinicios en cascada.
 
 Para probar el stack HTTPS en local, usar `DOMAIN=localhost`: Caddy usa su CA interna y `curl -k` acepta el certificado. Los E2E contra `https://localhost` usan `E2E_BASE_URL=https://localhost` y el overlay `deploy/docker-compose.e2e.yml`, que solo habilita el reloj fijo E2E; **no usarlo en producción**.
 ```

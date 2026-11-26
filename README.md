@@ -32,6 +32,8 @@ NODE_ENV=development
 
 En este entorno `.env` ya está configurado con el **session pooler** (`aws-1-us-west-2.pooler.supabase.com:5432`) y el rol dedicado `saltenanga_app` (credencial local, no versionada). El host directo `db.<ref>.supabase.co` no resuelve desde aquí, así que se usa el pooler.
 
+Guardar `.env` sin BOM (UTF-8 sin marca de orden de bytes): con BOM, Node registra la primera clave como `\uFEFFDATABASE_URL` y los comandos con `node --env-file=.env` fallan con «Falta DATABASE_URL».
+
 2. El esquema y el seed ya están aplicados en Supabase. Para reaplicarlos desde cero:
 
 ```bash
@@ -99,7 +101,7 @@ Requisitos: VPS con Docker y Docker Compose, dominio apuntando a la IP del servi
 
 1. Instalar Docker y el plugin de Compose en el servidor.
 2. Clonar el repositorio y copiar `.env.example` a `.env`. Completar `DATABASE_URL` (session pooler de Supabase), `JWT_SECRET` y definir `DOMAIN=tu-dominio.com` (sin `https://` ni barra final).
-3. Si se quieren notificaciones de ACME, descomentar `ACME_EMAIL` en `.env` y agregar `email {$ACME_EMAIL}` al bloque global de `deploy/Caddyfile` antes de arrancar. Sin correo, Caddy igual emite y renueva el certificado.
+3. Si se quieren notificaciones de ACME, agregar literalmente `email tu-correo@ejemplo.com` al bloque global de `deploy/Caddyfile` antes de arrancar. No usar `{$ACME_EMAIL}`: el servicio `caddy` no lee `.env` y la directiva quedaría vacía. Sin correo, Caddy igual emite y renueva el certificado.
 4. Arrancar:
 
    ```bash
@@ -128,9 +130,9 @@ docker compose down            # conserva caddy_data y caddy_config
 
 Para rollback, volver al commit conocido y ejecutar `docker compose up -d --build`; los volúmenes `caddy_data` y `caddy_config` se conservan, así que no se pierde el certificado.
 
-Si `DOMAIN` cambia, hay que reconstruir `web`: `NEXT_PUBLIC_API_URL` se incrusta en el bundle de Next en build time (`docker compose up -d --build web`). El servidor de Next llama a la API por `API_INTERNAL_URL=http://api:3001` en runtime, sin exponer el puerto 3001.
+Si `DOMAIN` cambia, hay que reconstruir todos los servicios (`docker compose up -d --build`): `NEXT_PUBLIC_API_URL` se incrusta en el bundle de Next en build time y Caddy lee el dominio al arrancar. Reconstruir solo `web` dejaría a Caddy sirviendo el dominio anterior. El volumen `caddy_data` conserva el certificado viejo hasta que Caddy obtiene el nuevo. El servidor de Next llama a la API por `API_INTERNAL_URL=http://api:3001` en runtime, sin exponer el puerto 3001.
 
-La API responde 502 si el upstream está caído: el healthcheck reinicia el contenedor, pero no reescribe el proxy en caliente. `/health` es un liveness check (no consulta Supabase), así que una caída del proveedor externo no dispara reinicios en cascada.
+La API responde 502 si el upstream está caído. Los healthchecks solo informan del estado y ordenan el arranque (`depends_on` con `service_healthy`): Docker **no** reinicia contenedores `unhealthy` por sí solo; `restart: unless-stopped` actúa solo si el proceso termina. Para recuperar un contenedor marcado como unhealthy, reiniciarlo manualmente (`docker compose restart <servicio>`). `/health` es un liveness check (no consulta Supabase), así que una caída del proveedor externo no dispara reinicios en cascada.
 
 Para probar el stack HTTPS en local, usar `DOMAIN=localhost`: Caddy usa su CA interna y `curl -k` acepta el certificado. Los E2E contra `https://localhost` usan `E2E_BASE_URL=https://localhost` y el overlay `deploy/docker-compose.e2e.yml`, que solo habilita el reloj fijo E2E; **no usarlo en producción**.
 

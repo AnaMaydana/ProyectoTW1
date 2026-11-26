@@ -27,7 +27,7 @@ test('pedido en 5 pasos, sesión y carrito persistentes', async ({ page, browser
   // Esperar a que el carrito deje de estar vacío: `toBeVisible()` con
   // /Total: Bs/ también coincide con "Total: Bs 0.00" y puede capturar el
   // storageState antes de que la API cree la cookie `cart_id`.
-  await expect(page.getByText(/Total: Bs/).first()).not.toHaveText(/0\.00/);
+  await expect(page.getByText(/Total: Bs/).first()).not.toHaveText(/^Total: Bs 0\.00$/);
 
   const state = await page.context().storageState();
   const viewport = page.viewportSize() ?? undefined;
