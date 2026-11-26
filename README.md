@@ -153,18 +153,30 @@ La web se sirve desde Vercel en `https://www.$DOMAIN`; la API sigue en el VPS, d
 
 ### Despliegue
 
+**Gate: no desplegar si falta cualquiera de estos tres prerrequisitos.** Verificar el token sin imprimirlo y confirmar DNS antes de cualquier comando de deploy:
+
+```powershell
+$DOMAIN = 'tu-dominio.com'
+"token_present=$([bool]$env:VERCEL_TOKEN)"    # debe ser True
+Resolve-DnsName -Name $DOMAIN -Type A          # IP del VPS
+Resolve-DnsName -Name "www.$DOMAIN" -Type CNAME  # cname.vercel-dns.com
+```
+
+Si `token_present=False`, o el registro A no apunta al VPS, o el CNAME de `www` no apunta a Vercel, detenerse y corregirlo antes de seguir.
+
 Desde la raíz del repo, con `VERCEL_TOKEN` ya exportado en el entorno:
 
 ```powershell
 npm install
 npx vercel@latest whoami
-'https://tu-dominio.com/api' | npx vercel@latest env add NEXT_PUBLIC_API_URL production --yes
+npx vercel@latest link --yes
+'https://tu-dominio.com/api' | npx vercel@latest env add NEXT_PUBLIC_API_URL --environment production --yes
 npx vercel@latest deploy --prod --yes
 npx vercel@latest domains add www.tu-dominio.com --yes
 npx vercel@latest alias set <url-del-deployment> www.tu-dominio.com
 ```
 
-La primera vez, `deploy` crea el proyecto; para un proyecto ya existente se puede usar `npx vercel@latest link --yes` antes. Reemplazar `<url-del-deployment>` por la URL que imprime `deploy`.
+`link` vincula el proyecto existente (o crea uno si aún no hay). `env add` necesita ese proyecto vinculado. Si la variable ya existe porque cambiaste de dominio, usar `'https://nuevo-dominio.com/api' | npx vercel@latest env update NEXT_PUBLIC_API_URL --environment production --yes` (o `env add ... --force`) y luego un nuevo deploy; `env add` sin `--force` falla cuando la variable ya está definida. Reemplazar `<url-del-deployment>` por la URL que imprime `deploy`.
 
 ### Verificación
 
