@@ -4,7 +4,7 @@ import { Product } from '../../lib/types';
 
 // Server Components corren dentro del contenedor `web`: ahí `localhost` es el
 // propio contenedor. En Docker se usa el nombre de servicio `api`.
-const BASE = process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const BASE = process.env.API_INTERNAL_URL ?? process.env.API_URL ?? (process.env.NEXT_PUBLIC_API_URL?.startsWith('http') ? process.env.NEXT_PUBLIC_API_URL : 'https://saltenanga-api.onrender.com');
 
 export default async function Menu({
   searchParams

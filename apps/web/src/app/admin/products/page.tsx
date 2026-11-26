@@ -16,6 +16,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 export default function AdminProducts() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
+  const [filter, setFilter] = useState<'active' | 'all'>('active');
   const [form, setForm] = useState<FormState>(empty);
   const [editing, setEditing] = useState<string | null>(null);
   const [fotoOriginal, setFotoOriginal] = useState<string | null>(null);
@@ -122,19 +123,33 @@ export default function AdminProducts() {
   };
 
   const deleteProduct = async (product: AdminProduct) => {
-    if (!window.confirm(`¿Eliminar definitivamente "${product.nombre}"?`)) return;
+    if (!window.confirm(`¿Eliminar "${product.nombre}"?`)) return;
     setError('');
     try {
       await api(`/admin/products/${product.id}`, { method: 'DELETE' });
-      if (editing === product.id) {
-        setEditing(null);
-        setForm(empty);
+    } catch {
+      // Si la API en la nube no tiene la ruta DELETE o el producto tiene ventas previas,
+      // se desactiva para que desaparezca de la lista activa sin romper el historial
+      try {
+        await api(`/admin/products/${product.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ activo: false, disponibleHoy: false })
+        });
+      } catch (err2) {
+        setError(err2 instanceof Error ? err2.message : 'No se pudo eliminar el producto');
+        return;
       }
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar el producto');
     }
+    if (editing === product.id) {
+      setEditing(null);
+      setForm(empty);
+      setFotoOriginal(null);
+      setUltimaSubida(null);
+    }
+    load();
   };
+
+  const visibleProducts = products.filter((p) => filter === 'all' || p.activo);
 
   return (
     <section>
@@ -156,11 +171,20 @@ export default function AdminProducts() {
             accept="image/jpeg,image/png,image/webp"
             onChange={onPhotoChange}
           />
+          <label style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.35rem' }}>
+            O introduce una URL de imagen:
+            <input
+              type="url"
+              placeholder="https://..."
+              value={form.fotoUrl ?? ''}
+              onChange={(e) => setForm({ ...form, fotoUrl: e.target.value || null })}
+            />
+          </label>
           {uploading && <p>Subiendo foto…</p>}
           {form.fotoUrl && (
             <div className="photo-actions">
               <img className="photo-preview" src={form.fotoUrl} alt="Vista previa de la foto" />
-              <button type="button" onClick={removePhoto}>Quitar foto</button>
+              <button type="button" className="btn-action btn-delete" onClick={removePhoto}>Quitar foto</button>
             </div>
           )}
         </div>
@@ -178,14 +202,54 @@ export default function AdminProducts() {
         </div>
       </form>
       {error && <p role="alert">{error}</p>}
+      
+      <div className="admin-filter-bar">
+        <button
+          type="button"
+          className={`btn-action ${filter === 'active' ? 'btn-edit' : 'btn-secondary'}`}
+          onClick={() => setFilter('active')}
+        >
+          Solo activos ({products.filter(p => p.activo).length})
+        </button>
+        <button
+          type="button"
+          className={`btn-action ${filter === 'all' ? 'btn-edit' : 'btn-secondary'}`}
+          onClick={() => setFilter('all')}
+        >
+          Todos ({products.length})
+        </button>
+      </div>
+
       <div className="table-scroll">
       <table>
-        <thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Foto</th>
+            <th>Producto</th>
+            <th>Categoría</th>
+            <th>Precio</th>
+            <th>Stock</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
         <tbody>
-          {products.map((p) => (
+          {visibleProducts.map((p) => (
             <tr key={p.id}>
-              <td>{p.nombre}</td><td>{p.categoria}</td><td>Bs {p.precio}</td>
-              <td>{p.stock}</td><td>{p.activo ? (p.disponibleHoy ? 'Disponible' : 'Sin stock del día') : 'Inactivo'}</td>
+              <td>
+                <img
+                  className="table-thumb"
+                  src={p.fotoUrl || 'https://placehold.co/100x70?text=Sin+foto'}
+                  alt={p.nombre}
+                  width={56}
+                  height={42}
+                />
+              </td>
+              <td><strong>{p.nombre}</strong></td>
+              <td>{p.categoria}</td>
+              <td>Bs {p.precio}</td>
+              <td>{p.stock}</td>
+              <td>{p.activo ? (p.disponibleHoy ? 'Disponible' : 'Sin stock del día') : 'Inactivo'}</td>
               <td>
                 <div className="table-actions">
                   <button
