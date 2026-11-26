@@ -4,10 +4,17 @@ export class ApiError extends Error {
   }
 }
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+function getBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL ?? '/api';
+  }
+  const serverUrl = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'https://saltenanga-api.onrender.com';
+  return serverUrl.startsWith('http') ? serverUrl : 'https://saltenanga-api.onrender.com';
+}
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const base = getBaseUrl();
+  const res = await fetch(`${base}${path}`, {
     ...init,
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) }
