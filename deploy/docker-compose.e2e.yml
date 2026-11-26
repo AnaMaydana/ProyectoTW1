@@ -1,0 +1,6 @@
+# Solo verificación local. NO usar en el VPS: permite E2E_FIXED_NOW, que se
+# ignora cuando NODE_ENV=production. El resto de la configuración es la base.
+services:
+  api:
+    environment:
+      NODE_ENV: test
