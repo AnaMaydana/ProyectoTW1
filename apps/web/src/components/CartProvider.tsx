@@ -1,11 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { Cart } from '../lib/types';
 import { api } from '../lib/api';
-import { CartDrawer } from './CartDrawer';
 
 const EMPTY_CART: Cart = { items: [], totalBs: '0.00' };
+
+const CartContext = createContext<{ cart: Cart; setCart: (cart: Cart) => void } | null>(null);
+
+export function useCart() {
+  const context = useContext(CartContext);
+  if (!context) throw new Error('useCart debe usarse dentro de CartProvider');
+  return context;
+}
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<Cart>(EMPTY_CART);
@@ -24,10 +31,5 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('cart:changed', load);
   }, []);
 
-  return (
-    <>
-      {children}
-      <CartDrawer initialCart={cart} onChange={setCart} />
-    </>
-  );
+  return <CartContext.Provider value={{ cart, setCart }}>{children}</CartContext.Provider>;
 }
