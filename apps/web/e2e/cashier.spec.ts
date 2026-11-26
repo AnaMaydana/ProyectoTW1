@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { ignoreHTTPSErrors } from './support/tls';
 
 const adminEmail = process.env.E2E_ADMIN_EMAIL ?? '';
 const adminPassword = process.env.E2E_ADMIN_PASSWORD ?? '';
@@ -8,7 +9,7 @@ const clientPassword = 'secret123';
 test('cajero cambia estados, entrega y muestra comprobante', async ({ browser }) => {
   test.skip(!adminEmail || !adminPassword, 'Requiere E2E_ADMIN_EMAIL y E2E_ADMIN_PASSWORD');
 
-  const clientContext = await browser.newContext();
+  const clientContext = await browser.newContext({ ignoreHTTPSErrors });
   const client = await clientContext.newPage();
   await client.addInitScript(() => {
     (window as unknown as { __printCalled: boolean }).__printCalled = false;
@@ -39,7 +40,7 @@ test('cajero cambia estados, entrega y muestra comprobante', async ({ browser })
   expect(code).toMatch(/^SAL-\d{8}-\d{4}$/);
   await expect(client.locator('[data-testid="order-qr"] svg')).toBeVisible();
 
-  const adminContext = await browser.newContext();
+  const adminContext = await browser.newContext({ ignoreHTTPSErrors });
   const cashier = await adminContext.newPage();
   await cashier.goto('/login', { waitUntil: 'networkidle' });
   await cashier.getByLabel('Correo').fill(adminEmail);

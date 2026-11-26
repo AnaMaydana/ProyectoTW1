@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { ignoreHTTPSErrors } from './support/tls';
 
 const email = `cliente-${Date.now()}-${Math.random().toString(36).slice(2)}@ejemplo.test`;
 const password = 'secret123';
@@ -30,7 +31,7 @@ test('pedido en 5 pasos, sesión y carrito persistentes', async ({ page, browser
   await page.close();
   await page.context().close();
 
-  const context2 = await browser.newContext({ storageState: state, viewport });
+  const context2 = await browser.newContext({ storageState: state, viewport, ignoreHTTPSErrors });
   const page2 = await context2.newPage();
   await page2.goto('/menu', { waitUntil: 'networkidle' });
   await expect(page2.getByText(/Total: Bs 0\.00/)).not.toBeVisible();
