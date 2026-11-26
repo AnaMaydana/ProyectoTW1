@@ -95,6 +95,53 @@ El script es idempotente: si el correo ya existe, lo promueve a ADMIN. Después 
 - El cliente puede cancelar solo mientras el pedido esté `PENDIENTE` y no haya vencido; si no, debe llamar al local.
 - El comprobante se descarga desde `/order/<código>/comprobante` (imprimir o guardar como PDF). El QR codifica solo el código `SAL-AAAAMMDD-####` para que el cajero lo lea como teclado; no es un QR de cobro.
 
+## Despliegue gratuito (Vercel + Render)
+
+La web se sirve desde Vercel en `https://<proyecto>.vercel.app` y la API desde un Web Service gratuito de Render en `https://<servicio>.onrender.com`. Vercel reescribe `/api/:path*` hacia Render, así que el navegador ve un único origen: las cookies `cart_id` y `sb_access` siguen siendo host-only, `httpOnly`, `sameSite=lax` y `secure` en producción, sin pasar a `sameSite=none`. No hace falta dominio propio ni VPS.
+
+### Render
+
+Crear un *Web Service* free apuntando a `https://github.com/AnaMaydana/ProyectoTW1`, rama `feature/fase6-vercel`, raíz del repo, Runtime `Node`, Health Check Path `/health`.
+
+- Build Command: `npm install --include=dev && npm -w apps/api run build`. El `--include=dev` es necesario porque Render define `NODE_ENV=production` y, sin él, `npm install` omite Nest CLI y el build falla con `nest: not found`.
+- Start Command: `npm -w api run start:prod`.
+- Variables: `DATABASE_URL` (URI del pooler de Supabase), `JWT_SECRET`, `CORS_ORIGIN` (URL de Vercel) y `NODE_ENV=production`. Render define `PORT`; la API lo lee con `apiPort()` y usa `API_PORT`/`3001` solo en local.
+- Los secretos se toman del `.env` local y se cargan en el dashboard; nunca se versionan ni se imprimen.
+
+Verificación directa (el plan free duerme tras 15 min; la primera llamada puede tardar ~1 min):
+
+```bash
+curl -i https://<servicio>.onrender.com/health    # 200, {"status":"ok",...}
+```
+
+### Vercel
+
+`vercel.json` contiene el build del workspace `apps/web` y el rewrite a la URL pública de Render. Configurar las variables del proyecto (no del repo):
+
+```powershell
+'/api' | npx vercel@latest env add NEXT_PUBLIC_API_URL --environment production --force --yes
+'https://<servicio>.onrender.com' | npx vercel@latest env add API_INTERNAL_URL --environment production --force --yes
+npx --yes vercel@latest deploy --prod --yes
+```
+
+`NEXT_PUBLIC_API_URL=/api` es la URL que usa el navegador. `API_INTERNAL_URL` es solo del servidor: el menú es un Server Component y necesita una URL absoluta para pedir productos durante el renderizado; sin ella `/menu` devuelve 500 con `ERR_INVALID_URL`. Cambiar cualquiera de las dos exige un nuevo deploy.
+
+Si `--force` no está disponible, borrar la variable con `npx vercel@latest env rm NEXT_PUBLIC_API_URL production --yes` y repetir `env add`.
+
+### Verificación
+
+```bash
+curl -I https://<proyecto>.vercel.app/menu          # 200
+curl -i https://<proyecto>.vercel.app/api/health    # 200 a través del proxy
+curl -i https://<proyecto>.vercel.app/api/cart      # Set-Cookie: cart_id=...; HttpOnly; SameSite=Lax; Secure
+```
+
+En el navegador: registro, carrito persistente al cerrar y checkout dentro de 06:00–11:00 de America/La_Paz. Fuera de horario solo se verifica el humo HTTP; `E2E_FIXED_NOW` es exclusivo de pruebas locales.
+
+### Rollback y límites
+
+Promover un deployment anterior en Vercel («Promote») o seleccionar un commit anterior en Render. La base no se toca, así que no hay migración inversa. Render free duerme tras 15 min y Supabase free se pausa tras una semana de inactividad; para disponibilidad continua se migra a plan pago o VPS sin cambiar el código.
+
 ## Despliegue en VPS
 
 Requisitos: VPS con Docker y Docker Compose, dominio apuntando a la IP del servidor (registro A) y puertos 80/443 libres.
