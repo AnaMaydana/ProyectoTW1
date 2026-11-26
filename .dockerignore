@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+**/.next
+**/dist
+.env
+.env.*
+!.env.example
+.git
+.superpowers
+docs
+scripts
+supabase
+**/test-results
+**/playwright-report
+**/coverage
+*.log

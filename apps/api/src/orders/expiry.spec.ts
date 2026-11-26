@@ -26,4 +26,18 @@ describe('buildExpiry', () => {
       'Fuera de horario'
     );
   });
+
+  it('respeta E2E_FIXED_NOW solo fuera de produccion', () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.E2E_FIXED_NOW = '2026-11-24T13:00:00.000Z';
+    try {
+      process.env.NODE_ENV = 'test';
+      expect(buildExpiry().minutesLeft).toBe(30);
+      process.env.NODE_ENV = 'production';
+      expect(() => buildExpiry()).toThrow('Fuera de horario');
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+      delete process.env.E2E_FIXED_NOW;
+    }
+  });
 });

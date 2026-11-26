@@ -73,14 +73,14 @@ export class AuthService {
   }
 
   async me(access?: string) {
-    if (!access) throw new UnauthorizedException();
+    if (!access) throw new UnauthorizedException('Inicie sesión para continuar');
     let payload: jwt.JwtPayload;
     try {
       payload = jwt.verify(access, env.jwtSecret) as jwt.JwtPayload;
     } catch {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('Sesión inválida o vencida');
     }
-    if (!payload.sub) throw new UnauthorizedException();
+    if (!payload.sub) throw new UnauthorizedException('Sesión inválida o vencida');
     return this.hydrate(Number(payload.sub));
   }
 
@@ -100,7 +100,7 @@ export class AuthService {
        WHERE u.id_usuario = $1 AND u.activo = TRUE`,
       [id]
     );
-    if (!result.rowCount) throw new UnauthorizedException();
+    if (!result.rowCount) throw new UnauthorizedException('Sesión inválida o vencida');
     return this.toUser(result.rows[0]);
   }
 

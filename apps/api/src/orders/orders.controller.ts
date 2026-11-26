@@ -65,6 +65,11 @@ export class OrdersController {
     return { orders: await this.orders.list(user.id) };
   }
 
+  @Get('code/:code')
+  async publicByCode(@Param('code') code: string) {
+    return { order: await this.orders.findPublicByCode(code) };
+  }
+
   @Post(':id/repeat')
   async repeat(
     @Req() req: Request,

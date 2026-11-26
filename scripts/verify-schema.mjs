@@ -41,7 +41,9 @@ const additive = [
   'CREATE TABLE carrito (',
   'CREATE TABLE carrito_detalle (',
   'idx_carrito_usuario',
-  'idx_carrito_detalle_producto'
+  'idx_carrito_detalle_producto',
+  'ALTER TABLE pedido ADD COLUMN id_cajero INT NULL REFERENCES usuario(id_usuario);',
+  'ALTER TABLE pedido ADD COLUMN fecha_entrega TIMESTAMPTZ;'
 ];
 
 for (const fragment of base) {

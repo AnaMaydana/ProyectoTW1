@@ -4,6 +4,7 @@
   "scripts": {
     "start:dev": "nest start --watch",
     "build": "nest build",
+    "start:prod": "node dist/src/main.js",
     "test": "jest"
   },
   "dependencies": {

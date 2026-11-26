@@ -14,6 +14,18 @@ describe('api', () => {
     expect((global.fetch as jest.Mock).mock.calls[0][1].credentials).toBe('include');
   });
 
+  it('muestra el mensaje del cuerpo JSON en vez del texto crudo', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: () => Promise.resolve('{"message":["Estado no permitido"],"statusCode":400}')
+    }) as any;
+
+    await expect(api('/cashier/orders/7/status')).rejects.toMatchObject({
+      message: 'Estado no permitido'
+    });
+  });
+
   it('devuelve JSON cuando la respuesta es correcta', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
