@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException, ConflictException, Injectable, Logger, NotFoundException
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
 export const PATCH_TRANSITIONS: Record<string, string[]> = {
@@ -108,5 +110,46 @@ export class CashierService {
     });
     this.logger.log(`cambiar_estado id_usuario=${userId} pedido=${id} de=${previous} a=${status}`);
     return this.byCode(code);
+  }
+
+  async deliver(id: string, code: string, userId: string) {
+    let previous = '';
+    let orderCode = '';
+    const comprobante = await this.db.transaction(async (client) => {
+      const current = await client.query<{ estado: string; codigo: string }>(
+        'SELECT estado, codigo FROM pedido WHERE id_pedido = $1 FOR UPDATE', [Number(id)]
+      );
+      if (!current.rowCount) throw new NotFoundException('Pedido no encontrado');
+      previous = current.rows[0].estado;
+      orderCode = current.rows[0].codigo;
+      if (previous !== 'LISTO') throw new ConflictException('El pedido no está listo para entrega');
+      if (orderCode !== code) throw new ConflictException('El código no coincide con el pedido');
+
+      const numero = `COM-${orderCode.slice(4, 12)}-${orderCode.slice(-4)}`;
+      await client.query(
+        `UPDATE pedido SET estado = 'ENTREGADO', id_cajero = $1, fecha_entrega = NOW()
+         WHERE id_pedido = $2`, [Number(userId), Number(id)]
+      );
+      await client.query(
+        `UPDATE pago SET estado = 'PAGADO', fecha_pago = NOW()
+         WHERE id_pedido = $1
+           AND id_metodo_pago = (SELECT id_metodo_pago FROM metodo_pago WHERE nombre = 'EFECTIVO')`,
+        [Number(id)]
+      );
+      await client.query(
+        `INSERT INTO comprobante (id_pedido, numero) VALUES ($1, $2)
+         ON CONFLICT (id_pedido) DO NOTHING`, [Number(id), numero]
+      );
+      const saved = await client.query<{ numero: string; fecha_emision: string }>(
+        `SELECT numero, to_char(fecha_emision, 'YYYY-MM-DD"T"HH24:MI:SS') AS fecha_emision
+         FROM comprobante WHERE id_pedido = $1`, [Number(id)]
+      );
+      return saved.rows[0];
+    });
+    this.logger.log(`entregar id_usuario=${userId} pedido=${id} de=${previous} a=ENTREGADO`);
+    return {
+      order: await this.byCode(orderCode),
+      comprobante: { numero: comprobante.numero, fechaEmision: comprobante.fecha_emision }
+    };
   }
 }

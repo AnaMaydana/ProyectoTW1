@@ -62,4 +62,37 @@ describe('CashierService', () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining('cambiar_estado id_usuario=3 pedido=7 de=PENDIENTE a=CONFIRMADO'));
     expect(log.mock.calls[0][0]).not.toContain('Ana');
   });
+
+  it('entrega solo si está LISTO y el código coincide', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    client.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ estado: 'LISTO', codigo: 'SAL-20261125-0007' }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // UPDATE pedido
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // UPDATE pago
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // INSERT comprobante
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{
+        numero: 'COM-20261125-0007', fecha_emision: '2026-11-25T10:05:00'
+      }] });
+
+    const result = await service.deliver('7', 'SAL-20261125-0007', '3');
+
+    expect(result.comprobante).toEqual({ numero: 'COM-20261125-0007', fechaEmision: '2026-11-25T10:05:00' });
+    expect(client.query.mock.calls[1][0]).toContain('id_cajero');
+    expect(client.query.mock.calls[1][0]).toContain('fecha_entrega');
+    expect(client.query.mock.calls[2][0]).toContain("nombre = 'EFECTIVO'");
+    expect(client.query.mock.calls[3][0]).toContain('ON CONFLICT (id_pedido) DO NOTHING');
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('entregar id_usuario=3 pedido=7 de=LISTO a=ENTREGADO'));
+  });
+
+  it('rechaza entrega si el pedido no está LISTO', async () => {
+    client.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ estado: 'PENDIENTE', codigo: 'SAL-20261125-0007' }] });
+    await expect(service.deliver('7', 'SAL-20261125-0007', '3')).rejects.toThrow('no está listo');
+    expect(client.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('rechaza entrega si el código no coincide', async () => {
+    client.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ estado: 'LISTO', codigo: 'SAL-20261125-0007' }] });
+    await expect(service.deliver('7', 'SAL-20261125-0008', '3')).rejects.toThrow('código no coincide');
+    expect(client.query).toHaveBeenCalledTimes(1);
+  });
 });
