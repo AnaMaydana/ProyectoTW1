@@ -4,13 +4,23 @@ import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import { AdminCategory, AdminProduct } from '../../../lib/types';
 
-const empty = { idCategoria: '', nombre: '', precio: '', stock: '' };
+type FormState = {
+  idCategoria: string; nombre: string; precio: string; stock: string;
+  fotoUrl: string | null;
+};
+
+const empty: FormState = { idCategoria: '', nombre: '', precio: '', stock: '', fotoUrl: null };
+const ALLOWED = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_BYTES = 5 * 1024 * 1024;
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState<FormState>(empty);
   const [editing, setEditing] = useState<string | null>(null);
+  const [fotoOriginal, setFotoOriginal] = useState<string | null>(null);
+  const [ultimaSubida, setUltimaSubida] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
   const load = () => {
@@ -29,19 +39,72 @@ export default function AdminProducts() {
   };
   useEffect(load, []);
 
+  const onPhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError('');
+    if (!ALLOWED.includes(file.type)) {
+      setError('Formato de imagen no permitido (usa JPG, PNG o WebP)');
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError('La foto debe pesar 5 MB o menos');
+      return;
+    }
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const dataUrl = String(reader.result);
+        const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+        const uploaded = await api<{ url: string }>('/admin/products/photo', {
+          method: 'POST',
+          body: JSON.stringify({ fileName: file.name, contentType: file.type, base64 })
+        });
+        setForm((current) => ({ ...current, fotoUrl: uploaded.url }));
+        setUltimaSubida(uploaded.url);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudo subir la foto');
+      } finally {
+        setUploading(false);
+      }
+    };
+    reader.onerror = () => {
+      setUploading(false);
+      setError('No se pudo subir la foto');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removePhoto = () => setForm((current) => ({ ...current, fotoUrl: null }));
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
-    const body = {
+    const body: Record<string, unknown> = {
       idCategoria: Number(form.idCategoria), nombre: form.nombre,
-      precio: Number(form.precio), stock: Number(form.stock || 0)
+      precio: Number(form.precio), stock: Number(form.stock || 0),
+      fotoUrl: form.fotoUrl
     };
+    if (editing && form.fotoUrl !== fotoOriginal) {
+      body.fotoUrlAnterior = fotoOriginal ?? undefined;
+    }
     try {
       if (editing) await api(`/admin/products/${editing}`, { method: 'PATCH', body: JSON.stringify(body) });
       else await api('/admin/products', { method: 'POST', body: JSON.stringify(body) });
-      setForm(empty); setEditing(null); load();
+      setForm(empty); setEditing(null); setFotoOriginal(null); setUltimaSubida(null); load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar');
+      if (ultimaSubida) {
+        try {
+          await api('/admin/products/photo', {
+            method: 'DELETE', body: JSON.stringify({ url: ultimaSubida })
+          });
+        } catch {
+          // La limpieza es best-effort; se conserva el error principal.
+        }
+        setUltimaSubida(null);
+      }
+      setError(err instanceof Error ? err.message : 'No se pudo guardar el producto');
     }
   };
 
@@ -71,6 +134,21 @@ export default function AdminProducts() {
         <label>Nombre<input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required /></label>
         <label>Precio Bs<input type="number" min="0" step="0.01" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} required /></label>
         <label>Stock<input type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} /></label>
+        <div className="photo-field">
+          <label htmlFor="producto-foto">Foto del producto</label>
+          <input
+            id="producto-foto" type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={onPhotoChange}
+          />
+          {uploading && <p>Subiendo foto…</p>}
+          {form.fotoUrl && (
+            <div className="photo-actions">
+              <img className="photo-preview" src={form.fotoUrl} alt="Vista previa de la foto" />
+              <button type="button" onClick={removePhoto}>Quitar foto</button>
+            </div>
+          )}
+        </div>
         <button type="submit">{editing ? 'Guardar cambios' : 'Crear producto'}</button>
       </form>
       {error && <p role="alert">{error}</p>}
@@ -83,7 +161,12 @@ export default function AdminProducts() {
               <td>{p.nombre}</td><td>{p.categoria}</td><td>Bs {p.precio}</td>
               <td>{p.stock}</td><td>{p.activo ? (p.disponibleHoy ? 'Disponible' : 'Sin stock del día') : 'Inactivo'}</td>
               <td>
-                <button onClick={() => { setEditing(p.id); setForm({ idCategoria: p.idCategoria, nombre: p.nombre, precio: p.precio, stock: String(p.stock) }); }}>Editar</button>
+                <button onClick={() => {
+                  setEditing(p.id);
+                  setForm({ idCategoria: p.idCategoria, nombre: p.nombre, precio: p.precio, stock: String(p.stock), fotoUrl: p.fotoUrl });
+                  setFotoOriginal(p.fotoUrl);
+                  setUltimaSubida(null);
+                }}>Editar</button>
                 {p.activo && <button onClick={() => deactivate(p)}>Desactivar</button>}
               </td>
             </tr>
