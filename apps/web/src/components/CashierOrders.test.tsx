@@ -36,7 +36,7 @@ describe('CashierOrders', () => {
     await waitFor(() => expect(screen.getByText(order.code)).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Confirmar entrega' })).not.toBeInTheDocument();
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Código del pedido'), { target: { value: order.code } });
+      fireEvent.change(screen.getByLabelText('Código del pedido (escaneá o escribí)'), { target: { value: order.code } });
       fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     });
     expect(await screen.findByRole('button', { name: 'Confirmar entrega' })).toBeInTheDocument();
@@ -65,5 +65,30 @@ describe('CashierOrders', () => {
     expect(confirm).toHaveBeenCalled();
     expect(api).not.toHaveBeenCalledWith('/cashier/orders/7/status', expect.anything());
     confirm.mockRestore();
+  });
+
+  it('normaliza el código escaneado antes de buscar y entregar', async () => {
+    const deliver = jest.fn().mockResolvedValue({ comprobante: { numero: 'COM-20261125-0007' } });
+    (api as jest.Mock).mockImplementation((path: string, init?: RequestInit) => {
+      if (path === '/cashier/orders') return Promise.resolve({ orders: [order] });
+      if (path.startsWith('/cashier/orders/code/')) return Promise.resolve({ order });
+      if (path === '/cashier/orders/7/deliver') return deliver(path, init);
+      return Promise.resolve({});
+    });
+    render(<CashierOrders />);
+    await waitFor(() => expect(screen.getByText(order.code)).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Código del pedido (escaneá o escribí)'), {
+        target: { value: `  ${order.code.toLowerCase()}\n` }
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    });
+    expect(api).toHaveBeenCalledWith(`/cashier/orders/code/${order.code}`);
+    await act(async () => {
+      fireEvent.click(await screen.findByRole('button', { name: 'Confirmar entrega' }));
+    });
+    expect(deliver).toHaveBeenCalledWith('/cashier/orders/7/deliver', {
+      method: 'POST', body: JSON.stringify({ code: order.code })
+    });
   });
 });
