@@ -1,4 +1,4 @@
-import { apiPort, loadEnv } from './env';
+import { apiPort, loadEnv, supabaseServiceRoleKey, supabaseUrl } from './env';
 
 const original = { ...process.env };
 
@@ -87,5 +87,35 @@ describe('loadEnv() variables obligatorias', () => {
     delete process.env.JWT_SECRET;
 
     expect(() => loadEnv()).toThrow('Falta JWT_SECRET');
+  });
+});
+
+describe('configuración de Supabase Storage', () => {
+  const originalUrl = process.env.SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  afterEach(() => {
+    if (originalUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = originalUrl;
+    if (originalKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+  });
+
+  it('devuelve la URL sin barra final', () => {
+    process.env.SUPABASE_URL = 'https://demo.supabase.co/';
+
+    expect(supabaseUrl()).toBe('https://demo.supabase.co');
+  });
+
+  it('falla en español si falta SUPABASE_URL', () => {
+    delete process.env.SUPABASE_URL;
+
+    expect(() => supabaseUrl()).toThrow('Falta SUPABASE_URL');
+  });
+
+  it('falla en español si falta SUPABASE_SERVICE_ROLE_KEY', () => {
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    expect(() => supabaseServiceRoleKey()).toThrow('Falta SUPABASE_SERVICE_ROLE_KEY');
   });
 });

@@ -28,3 +28,16 @@ export function apiPort(): number {
   const value = Number(process.env.PORT || process.env.API_PORT || 3001);
   return Number.isFinite(value) && value > 0 && value <= 65535 ? Math.floor(value) : 3001;
 }
+
+/** Se leen al usar Storage, no al importar el módulo, para no romper tests sin Storage. */
+export function supabaseUrl(): string {
+  const value = process.env.SUPABASE_URL;
+  if (!value) throw new Error('Falta SUPABASE_URL');
+  return value.replace(/\/$/, '');
+}
+
+export function supabaseServiceRoleKey(): string {
+  const value = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!value) throw new Error('Falta SUPABASE_SERVICE_ROLE_KEY');
+  return value;
+}
