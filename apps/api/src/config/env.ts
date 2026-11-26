@@ -13,3 +13,9 @@ export function loadEnv() {
 }
 
 export const env = loadEnv();
+
+/** Umbral de stock bajo, leído en cada llamada para poder ajustarlo sin reiniciar módulos. */
+export function lowStockThreshold(): number {
+  const value = Number(process.env.LOW_STOCK_THRESHOLD ?? 5);
+  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 5;
+}

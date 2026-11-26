@@ -69,4 +69,24 @@ describe('AdminCatalogService', () => {
   it('stock negativo se rechaza en el servicio', async () => {
     await expect(service.updateInventory('1', { stock: -1 })).rejects.toThrow('stock');
   });
+
+  it('rechaza stock negativo en updateProduct antes de escribir', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [{ nombre: 'Carne' }], rowCount: 1 });
+    await expect(service.updateProduct('1', { stock: -1 })).rejects.toThrow('stock');
+    expect((db.query as jest.Mock)).toHaveBeenCalledTimes(1);
+  });
+
+  it('usa LOW_STOCK_THRESHOLD del entorno por defecto', async () => {
+    const previous = process.env.LOW_STOCK_THRESHOLD;
+    process.env.LOW_STOCK_THRESHOLD = '9';
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+    try {
+      await service.listInventory();
+      const params = (db.query as jest.Mock).mock.calls[0][1];
+      expect(params).toEqual([9]);
+    } finally {
+      if (previous === undefined) delete process.env.LOW_STOCK_THRESHOLD;
+      else process.env.LOW_STOCK_THRESHOLD = previous;
+    }
+  });
 });

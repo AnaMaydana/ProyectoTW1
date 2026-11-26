@@ -5,6 +5,7 @@ import {
   NotFoundException
 } from '@nestjs/common';
 import { QueryResultRow } from 'pg';
+import { lowStockThreshold } from '../config/env';
 import { DatabaseService } from '../database/database.service';
 
 export interface AdminCategory {
@@ -37,7 +38,7 @@ interface ProductRow {
 }
 interface InventoryRow {
   id_inventario: number; id_producto: number; nombre: string;
-  stock: number; disponible_hoy: boolean;
+  stock: number; disponible_hoy: boolean; low_stock: boolean;
 }
 
 interface QueryRunner {
@@ -161,6 +162,9 @@ export class AdminCatalogService {
       'SELECT nombre FROM producto WHERE id_producto = $1', [productId]
     );
     if (!current.rowCount) throw new NotFoundException('Producto no encontrado');
+    if (dto.stock !== undefined && dto.stock < 0) {
+      throw new BadRequestException('stock no puede ser negativo');
+    }
     if (dto.nombre && dto.nombre !== current.rows[0].nombre) {
       await this.ensureUnique('producto', dto.nombre, productId);
     }
@@ -176,7 +180,6 @@ export class AdminCatalogService {
     );
 
     if (dto.stock !== undefined) {
-      if (dto.stock < 0) throw new BadRequestException('stock no puede ser negativo');
       await this.db.query('UPDATE inventario SET stock = $2 WHERE id_producto = $1', [productId, dto.stock]);
     }
     if (dto.disponibleHoy !== undefined || dto.activo === false) {
@@ -186,15 +189,16 @@ export class AdminCatalogService {
     return this.oneProduct(productId);
   }
 
-  async listInventory(threshold = 5): Promise<AdminInventoryItem[]> {
+  async listInventory(threshold = lowStockThreshold()): Promise<AdminInventoryItem[]> {
     const result = await this.db.query<InventoryRow>(`
-      SELECT i.id_inventario, i.id_producto, p.nombre, i.stock, i.disponible_hoy
+      SELECT i.id_inventario, i.id_producto, p.nombre, i.stock, i.disponible_hoy,
+             (i.stock <= $1) AS low_stock
       FROM inventario i JOIN producto p ON p.id_producto = i.id_producto
-      ORDER BY i.stock ASC, p.nombre`);
+      ORDER BY i.stock ASC, p.nombre`, [threshold]);
     return result.rows.map((row) => ({
       id: String(row.id_inventario), productId: String(row.id_producto), nombre: row.nombre,
       stock: Number(row.stock), disponibleHoy: row.disponible_hoy,
-      lowStock: Number(row.stock) <= threshold
+      lowStock: Boolean(row.low_stock)
     }));
   }
 

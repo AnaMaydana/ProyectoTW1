@@ -1,6 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body, Controller, Get, Logger, Param, Patch, Post, Query, Req, UseFilters, UseGuards
+} from '@nestjs/common';
+import { Request } from 'express';
+import { lowStockThreshold } from '../config/env';
 import { Roles } from '../common/guards/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { AdminExceptionFilter } from './admin-exception.filter';
 import { AdminCatalogService } from './admin-catalog.service';
 import { AdminReportsService } from './admin-reports.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
@@ -9,24 +14,37 @@ import { LowStockDto, ReportRangeDto, TopProductsDto } from './dto/report.dto';
 
 @Controller('admin')
 @UseGuards(RolesGuard)
+@UseFilters(AdminExceptionFilter)
 @Roles('ADMIN')
 export class AdminController {
+  private readonly logger = new Logger(AdminController.name);
+
   constructor(
     private catalog: AdminCatalogService,
     private reports: AdminReportsService
   ) {}
 
+  /** Auditoría: solo id_usuario y acción, nunca datos personales. */
+  private audit(req: Request, action: string) {
+    const id = (req as Request & { user?: { id?: string } }).user?.id ?? 'desconocido';
+    this.logger.log(`${action} id_usuario=${id}`);
+  }
+
   @Get('categories')
   async categories() { return { categories: await this.catalog.listCategories() }; }
 
   @Post('categories')
-  async createCategory(@Body() dto: CreateCategoryDto) {
-    return { category: await this.catalog.createCategory(dto.nombre) };
+  async createCategory(@Req() req: Request, @Body() dto: CreateCategoryDto) {
+    const category = await this.catalog.createCategory(dto.nombre);
+    this.audit(req, 'crear_categoria');
+    return { category };
   }
 
   @Patch('categories/:id')
-  async updateCategory(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
-    return { category: await this.catalog.updateCategory(Number(id), dto) };
+  async updateCategory(@Req() req: Request, @Param('id') id: string, @Body() dto: UpdateCategoryDto) {
+    const category = await this.catalog.updateCategory(Number(id), dto);
+    this.audit(req, 'editar_categoria');
+    return { category };
   }
 
   @Get('products')
@@ -38,23 +56,31 @@ export class AdminController {
   }
 
   @Post('products')
-  async createProduct(@Body() dto: CreateProductDto) {
-    return { product: await this.catalog.createProduct(dto) };
+  async createProduct(@Req() req: Request, @Body() dto: CreateProductDto) {
+    const product = await this.catalog.createProduct(dto);
+    this.audit(req, 'crear_producto');
+    return { product };
   }
 
   @Patch('products/:id')
-  async updateProduct(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    return { product: await this.catalog.updateProduct(Number(id), dto) };
+  async updateProduct(@Req() req: Request, @Param('id') id: string, @Body() dto: UpdateProductDto) {
+    const product = await this.catalog.updateProduct(Number(id), dto);
+    this.audit(req, 'editar_producto');
+    return { product };
   }
 
   @Get('inventory')
-  async inventory(@Query('threshold') threshold?: string) {
-    return { items: await this.catalog.listInventory(threshold ? Number(threshold) : 5) };
+  async inventory(@Query() query: LowStockDto) {
+    return {
+      items: await this.catalog.listInventory(query.threshold ?? lowStockThreshold())
+    };
   }
 
   @Patch('inventory/:id')
-  async updateInventory(@Param('id') id: string, @Body() dto: UpdateInventoryDto) {
-    return { item: await this.catalog.updateInventory(Number(id), dto) };
+  async updateInventory(@Req() req: Request, @Param('id') id: string, @Body() dto: UpdateInventoryDto) {
+    const item = await this.catalog.updateInventory(Number(id), dto);
+    this.audit(req, 'editar_inventario');
+    return { item };
   }
 
   @Get('reports/sales')
@@ -74,6 +100,6 @@ export class AdminController {
 
   @Get('reports/low-stock')
   async lowStock(@Query() query: LowStockDto) {
-    return { rows: await this.reports.lowStock(query.threshold) };
+    return { rows: await this.reports.lowStock(query.threshold ?? lowStockThreshold()) };
   }
 }

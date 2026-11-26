@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { lowStockThreshold } from '../config/env';
 import { DatabaseService } from '../database/database.service';
 import { businessNow } from '../orders/expiry';
 
@@ -15,8 +16,15 @@ export class AdminReportsService {
   constructor(private db: DatabaseService) {}
 
   private validate(from?: string, to?: string): [string, string] {
-    if (from && !DATE.test(from)) throw new BadRequestException('from debe ser AAAA-MM-DD');
-    if (to && !DATE.test(to)) throw new BadRequestException('to debe ser AAAA-MM-DD');
+    const realDate = (value: string) => {
+      if (!DATE.test(value)) return false;
+      const [year, month, day] = value.split('-').map(Number);
+      const parsed = new Date(Date.UTC(year, month - 1, day));
+      return parsed.getUTCFullYear() === year &&
+        parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+    };
+    if (from && !realDate(from)) throw new BadRequestException('from debe ser AAAA-MM-DD');
+    if (to && !realDate(to)) throw new BadRequestException('to debe ser AAAA-MM-DD');
     const start = from ?? localToday();
     const end = to ?? start;
     if (start > end) throw new BadRequestException('from no puede ser mayor que to');
@@ -26,7 +34,8 @@ export class AdminReportsService {
   private async bounds(from?: string, to?: string): Promise<[string, string]> {
     const [start, end] = this.validate(from, to);
     const tz = await this.db.query<{ TimeZone: string }>('SHOW TIMEZONE');
-    const shift = tz.rows[0]?.TimeZone === 'UTC' ? 4 : 0;
+    const zone = tz.rows[0]?.TimeZone ?? '';
+    const shift = /^(utc|etc\/utc|gmt)$/i.test(zone) ? 4 : 0;
     const begin = new Date(`${start}T00:00:00.000Z`);
     begin.setUTCHours(begin.getUTCHours() - shift);
     const finish = new Date(`${end}T00:00:00.000Z`);
@@ -78,7 +87,7 @@ export class AdminReportsService {
     return result.rows;
   }
 
-  async lowStock(threshold = 5) {
+  async lowStock(threshold = lowStockThreshold()) {
     const result = await this.db.query(
       `SELECT p.id_producto::text AS "productId", p.nombre, i.stock
        FROM inventario i JOIN producto p ON p.id_producto = i.id_producto

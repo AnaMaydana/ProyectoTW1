@@ -37,4 +37,29 @@ describe('AdminReportsService', () => {
     await service.lowStock(undefined);
     expect((db.query as jest.Mock).mock.calls[0][1]).toEqual([5]);
   });
+
+  it('rechaza fechas inexistentes', async () => {
+    await expect(service.sales('2026-02-30', undefined)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('usa LOW_STOCK_THRESHOLD del entorno cuando no se da umbral', async () => {
+    const previous = process.env.LOW_STOCK_THRESHOLD;
+    process.env.LOW_STOCK_THRESHOLD = '9';
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+    try {
+      await service.lowStock(undefined);
+      expect((db.query as jest.Mock).mock.calls[0][1]).toEqual([9]);
+    } finally {
+      if (previous === undefined) delete process.env.LOW_STOCK_THRESHOLD;
+      else process.env.LOW_STOCK_THRESHOLD = previous;
+    }
+  });
+
+  it('reconoce Etc/UTC como zona UTC', async () => {
+    (db.query as jest.Mock)
+      .mockResolvedValueOnce({ rows: [{ TimeZone: 'Etc/UTC' }] })
+      .mockResolvedValueOnce({ rows: [] });
+    await service.sales('2026-11-25', '2026-11-25');
+    expect((db.query as jest.Mock).mock.calls[1][1][0]).toBe('2026-11-24T20:00:00.000Z');
+  });
 });
