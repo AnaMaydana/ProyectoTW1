@@ -41,4 +41,17 @@ describe('AdminProducts', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Desactivar' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo desactivar el producto');
   });
+
+  it('muestra el error si falla la carga del catálogo', async () => {
+    (api as jest.Mock).mockImplementation((path: string) => {
+      if (path.startsWith('/admin/products?')) {
+        return Promise.reject(new Error('No se pudo cargar la lista de productos'));
+      }
+      return Promise.resolve({ categories: [category] });
+    });
+    render(<AdminProducts />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No se pudo cargar la lista de productos'
+    );
+  });
 });

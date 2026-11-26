@@ -22,10 +22,11 @@ describe('AdminCatalogService', () => {
     await expect(service.createCategory('Salteñas')).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('crea producto e inventario en una transaccion', async () => {
+  it('crea producto e inventario en una transaccion sin pedir otra conexion al pool', async () => {
     const client = { query: jest.fn() };
     client.query
       .mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 }) // SELECT categoria
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })          // ensureUnique con el client de la transacción
       .mockResolvedValueOnce({ rows: [{ id_producto: 7 }] })    // INSERT producto
       .mockResolvedValueOnce({ rows: [] })                      // INSERT inventario
       .mockResolvedValueOnce({
@@ -33,14 +34,14 @@ describe('AdminCatalogService', () => {
                  precio: '12.00', foto_url: null, activo: true, stock: 0, disponible_hoy: false }]
       });                                                      // oneProduct EN la transacción
     (db.transaction as jest.Mock).mockImplementation((work: any) => work(client));
-    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [], rowCount: 0 }); // ensureUnique
 
     const product = await service.createProduct({
       idCategoria: 1, nombre: 'Carne', precio: 12
     });
 
     expect((db.transaction as jest.Mock)).toHaveBeenCalledTimes(1);
-    expect(client.query).toHaveBeenCalledTimes(4);
+    expect(db.query).not.toHaveBeenCalled();
+    expect(client.query).toHaveBeenCalledTimes(5);
     expect(product).toMatchObject({ id: '7', stock: 0, disponibleHoy: false, precio: '12.00' });
   });
 

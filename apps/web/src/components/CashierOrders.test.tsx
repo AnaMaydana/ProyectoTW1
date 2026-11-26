@@ -42,6 +42,18 @@ describe('CashierOrders', () => {
     expect(await screen.findByRole('button', { name: 'Confirmar entrega' })).toBeInTheDocument();
   });
 
+  it('muestra el vencimiento y avisa cuando faltan menos de 10 minutos', async () => {
+    jest.setSystemTime(new Date('2026-11-25T14:00:00.000Z'));
+    (api as jest.Mock).mockImplementation((path: string) => Promise.resolve(
+      path.startsWith('/cashier/orders/code/') ? { order }
+        : { orders: [{ ...order, expiresAt: '2026-11-25T14:05:00.000Z' }] }
+    ));
+    render(<CashierOrders />);
+    expect(await screen.findByText(order.code)).toBeInTheDocument();
+    expect(screen.getByText('Vencimiento')).toBeInTheDocument();
+    expect(screen.getByText(/Vence en 5 min/)).toBeInTheDocument();
+  });
+
   it('pide confirmación antes de cancelar', async () => {
     (api as jest.Mock).mockResolvedValue({ orders: [{ ...order, status: 'PENDIENTE' }] });
     render(<CashierOrders />);

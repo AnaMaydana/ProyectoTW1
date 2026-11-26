@@ -36,4 +36,10 @@ describe('AdminCategories', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Desactivar' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo actualizar la categoría');
   });
+
+  it('muestra el error si falla la carga de categorías', async () => {
+    (api as jest.Mock).mockRejectedValue(new Error('No se pudo cargar las categorías'));
+    render(<AdminCategories />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar las categorías');
+  });
 });

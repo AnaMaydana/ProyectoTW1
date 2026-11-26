@@ -64,6 +64,10 @@ describe('AuthService', () => {
     ).rejects.toThrow('Credenciales inválidas');
   });
 
+  it('devuelve 401 en español cuando el token no es válido', async () => {
+    await expect(service.me('token-invalido')).rejects.toThrow('Sesión inválida o vencida');
+  });
+
   it('lee el usuario desde el JWT', async () => {
     const token = jwt.sign({ sub: '7' }, 'test-secret');
     (db.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1, rows: [userRow] });

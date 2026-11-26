@@ -11,7 +11,11 @@ export default function AdminCategories() {
 
   const load = () => {
     api<{ categories: AdminCategory[] }>('/admin/categories')
-      .then((r) => setCategories(r.categories)).catch(() => setCategories([]));
+      .then((r) => setCategories(r.categories))
+      .catch((err) => {
+        setCategories([]);
+        setError(err instanceof Error ? err.message : 'No se pudo cargar las categorías');
+      });
   };
   useEffect(load, []);
 

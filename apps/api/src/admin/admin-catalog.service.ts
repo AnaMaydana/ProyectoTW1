@@ -42,7 +42,9 @@ interface InventoryRow {
 }
 
 interface QueryRunner {
-  query<T extends QueryResultRow = any>(text: string, params?: unknown[]): Promise<{ rows: T[] }>;
+  query<T extends QueryResultRow = any>(
+    text: string, params?: unknown[]
+  ): Promise<{ rows: T[]; rowCount?: number | null }>;
 }
 
 const productSelect = `
@@ -56,8 +58,13 @@ const productSelect = `
 export class AdminCatalogService {
   constructor(private db: DatabaseService) {}
 
-  private async ensureUnique(table: 'categoria' | 'producto', nombre: string, exceptId?: number) {
-    const result = await this.db.query(
+  private async ensureUnique(
+    table: 'categoria' | 'producto',
+    nombre: string,
+    exceptId?: number,
+    runner: QueryRunner = this.db
+  ) {
+    const result = await runner.query(
       `SELECT 1 FROM ${table} WHERE lower(nombre) = lower($1)
        AND ($2::int IS NULL OR id_${table === 'categoria' ? 'categoria' : 'producto'} <> $2)`,
       [nombre, exceptId ?? null]
@@ -140,7 +147,7 @@ export class AdminCatalogService {
     return this.db.transaction(async (client) => {
       const category = await client.query('SELECT 1 FROM categoria WHERE id_categoria = $1', [dto.idCategoria]);
       if (!category.rowCount) throw new NotFoundException('Categoría no encontrada');
-      await this.ensureUnique('producto', dto.nombre);
+      await this.ensureUnique('producto', dto.nombre, undefined, client);
 
       const inserted = await client.query<{ id_producto: number }>(
         `INSERT INTO producto (id_categoria, nombre, descripcion, precio, foto_url, activo)

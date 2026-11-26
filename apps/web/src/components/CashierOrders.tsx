@@ -10,6 +10,16 @@ const NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
   PREPARANDO: 'LISTO'
 };
 
+function expiryLabel(expiresAt: string, now = Date.now()): string {
+  const time = new Intl.DateTimeFormat('es-BO', {
+    timeZone: 'America/La_Paz', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).format(new Date(expiresAt));
+  const minutes = Math.ceil((new Date(expiresAt).getTime() - now) / 60000);
+  if (minutes <= 0) return `${time} — Vencido`;
+  if (minutes < 10) return `${time} — Vence en ${minutes} min`;
+  return time;
+}
+
 export function CashierOrders() {
   const [orders, setOrders] = useState<CashierOrder[]>([]);
   const [code, setCode] = useState('');
@@ -95,7 +105,7 @@ export function CashierOrders() {
       <div className="table-scroll">
         <table>
           <thead>
-            <tr><th>Código</th><th>Cliente</th><th>Recojo</th><th>Estado</th><th>Total</th><th>Pago</th><th>Acciones</th></tr>
+            <tr><th>Código</th><th>Cliente</th><th>Recojo</th><th>Vencimiento</th><th>Estado</th><th>Total</th><th>Pago</th><th>Acciones</th></tr>
           </thead>
           <tbody>
             {orders.map((order) => (
@@ -103,6 +113,7 @@ export function CashierOrders() {
                 <td>{order.code}</td>
                 <td>{order.customerName ?? 'Invitado'}</td>
                 <td>{order.pickupTime}</td>
+                <td>{expiryLabel(order.expiresAt)}</td>
                 <td>{order.status}</td>
                 <td>Bs {order.totalBs}</td>
                 <td>{order.paymentMethod}</td>

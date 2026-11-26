@@ -22,8 +22,11 @@ test('cajero cambia estados, entrega y muestra comprobante', async ({ browser })
   await client.getByRole('button', { name: 'Crear cuenta' }).click();
   await expect(client).toHaveURL(/\/menu/);
   await client.waitForLoadState('networkidle');
+  const added = client.waitForResponse(
+    (r) => r.url().includes('/cart/items') && r.request().method() === 'POST'
+  );
   await client.getByRole('button', { name: 'Agregar' }).first().click();
-  await expect(client.getByText(/Total: Bs/)).toBeVisible();
+  expect((await (await added).json()).cart.items.length).toBeGreaterThan(0);
   await client.goto('/checkout', { waitUntil: 'networkidle' });
   await client.getByLabel('Hora de recojo').fill('10:00');
   await client.getByRole('button', { name: 'Confirmar pedido' }).click();

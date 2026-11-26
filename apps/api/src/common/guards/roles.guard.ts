@@ -28,10 +28,12 @@ export class RolesGuard implements CanActivate {
 
     const req = context.switchToHttp().getRequest<Request>();
     const token = this.cookies.read(req, 'sb_access');
-    if (!token) throw new UnauthorizedException();
+    if (!token) throw new UnauthorizedException('Inicie sesión para continuar');
 
     const user = await this.auth.me(token); // lanza 401 si es inválido o está inactivo
-    if (!required.includes(user.role)) throw new ForbiddenException();
+    if (!required.includes(user.role)) {
+      throw new ForbiddenException('No tiene permiso para esta sección');
+    }
     (req as Request & { user?: unknown }).user = user;
     return true;
   }

@@ -19,4 +19,16 @@ describe('AdminReports', () => {
     expect(screen.getAllByText('Total Bs').length).toBeGreaterThan(0);
     expect(screen.queryByText('totalBs')).not.toBeInTheDocument();
   });
+
+  it('muestra el error si falla la carga de un reporte', async () => {
+    (api as jest.Mock).mockImplementation((path: string) =>
+      path === '/admin/reports/sales'
+        ? Promise.reject(new Error('No se pudo cargar el reporte de ventas'))
+        : Promise.resolve({ rows: [] })
+    );
+    render(<AdminReports />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No se pudo cargar el reporte de ventas'
+    );
+  });
 });

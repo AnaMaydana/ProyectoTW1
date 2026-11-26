@@ -22,9 +22,9 @@ describe('RolesGuard', () => {
     reflector.getAllAndOverride.mockReturnValue(['ADMIN']);
   });
 
-  it('401 sin cookie', async () => {
+  it('401 sin cookie y mensaje en español', async () => {
     cookies.read.mockReturnValue(undefined);
-    await expect(guard.canActivate(ctx())).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(guard.canActivate(ctx())).rejects.toThrow('Inicie sesión para continuar');
     expect(auth.me).not.toHaveBeenCalled();
   });
 
@@ -34,10 +34,10 @@ describe('RolesGuard', () => {
     await expect(guard.canActivate(ctx('token'))).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it('403 para CLIENTE', async () => {
+  it('403 para CLIENTE con mensaje en español', async () => {
     cookies.read.mockReturnValue('token');
     auth.me.mockResolvedValue({ id: '1', role: 'CLIENTE' });
-    await expect(guard.canActivate(ctx('token'))).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(guard.canActivate(ctx('token'))).rejects.toThrow('No tiene permiso para esta sección');
   });
 
   it('permite ADMIN y expone req.user', async () => {
