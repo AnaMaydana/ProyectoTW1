@@ -50,4 +50,10 @@ describe('AuthNav', () => {
     expect(api).toHaveBeenCalledWith('/auth/logout', { method: 'POST' });
     expect(assign).toHaveBeenCalledWith('/menu');
   });
+
+  it('muestra Administración solo para ADMIN', async () => {
+    (api as jest.Mock).mockResolvedValueOnce({ ...user, role: 'ADMIN' });
+    render(<AuthNav />);
+    expect(await screen.findByRole('link', { name: 'Administración' })).toBeInTheDocument();
+  });
 });

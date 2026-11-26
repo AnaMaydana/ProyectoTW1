@@ -20,6 +20,7 @@ export function AuthNav() {
   return user ? (
     <>
       <a href="/profile">Mi perfil</a>
+      {user.role === 'ADMIN' && <a href="/admin">Administración</a>}
       <button onClick={logout}>Cerrar sesión</button>
     </>
   ) : (

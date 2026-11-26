@@ -51,3 +51,17 @@ export interface Order {
     unitPriceBs: string;
   }>;
 }
+
+export interface AdminCategory {
+  id: string; nombre: string; activa: boolean; productCount: number;
+}
+export interface AdminProduct {
+  id: string; idCategoria: string; categoria: string; nombre: string;
+  precio: string; fotoUrl: string | null; activo: boolean;
+  stock: number; disponibleHoy: boolean;
+}
+export interface AdminInventoryItem {
+  id: string; productId: string; nombre: string;
+  stock: number; disponibleHoy: boolean; lowStock: boolean;
+}
+export interface ReportRow { [key: string]: string | number; }
