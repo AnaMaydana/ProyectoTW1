@@ -4,7 +4,7 @@ export default function CashierHome() {
   return (
     <section>
       <h1>Cajero</h1>
-      <p>Pedidos recientes. La lista se actualiza sola cada 4 segundos.</p>
+      <p>Gestión de pedidos, apertura y cierre de turno con arqueo de caja.</p>
       <CashierOrders />
     </section>
   );
