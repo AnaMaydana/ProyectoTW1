@@ -10,6 +10,10 @@ const NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
   PREPARANDO: 'LISTO'
 };
 
+export function normalizeCode(raw: string): string {
+  return raw.trim().toUpperCase();
+}
+
 function expiryLabel(expiresAt: string, now = Date.now()): string {
   const time = new Intl.DateTimeFormat('es-BO', {
     timeZone: 'America/La_Paz', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
@@ -25,6 +29,7 @@ export function CashierOrders() {
   const [code, setCode] = useState('');
   const [selected, setSelected] = useState<CashierOrderDetail | null>(null);
   const [message, setMessage] = useState('');
+  const normalizedCode = normalizeCode(code);
 
   const refresh = useCallback(async () => {
     try {
@@ -63,7 +68,7 @@ export function CashierOrders() {
     setMessage('');
     try {
       const res = await api<{ order: CashierOrderDetail }>(
-        `/cashier/orders/code/${encodeURIComponent(code)}`
+        `/cashier/orders/code/${encodeURIComponent(normalizedCode)}`
       );
       setSelected(res.order);
       if (res.order.status !== 'LISTO') setMessage('El pedido no está listo para entrega');
@@ -79,7 +84,7 @@ export function CashierOrders() {
     try {
       const res = await api<{ comprobante: { numero: string } }>(
         `/cashier/orders/${selected.id}/deliver`,
-        { method: 'POST', body: JSON.stringify({ code }) }
+        { method: 'POST', body: JSON.stringify({ code: normalizedCode }) }
       );
       setMessage(`Comprobante ${res.comprobante.numero}`);
       setSelected(null);
@@ -94,11 +99,11 @@ export function CashierOrders() {
     <section>
       {message && <p role="status">{message}</p>}
       <div>
-        <label htmlFor="cashier-code">Código del pedido</label>
+        <label htmlFor="cashier-code">Código del pedido (escaneá o escribí)</label>
         <input id="cashier-code" value={code} onChange={(e) => setCode(e.target.value)} />
         <button type="button" onClick={() => { void search(); }}>Buscar</button>
       </div>
-      {selected?.status === 'LISTO' && selected.code === code && (
+      {selected?.status === 'LISTO' && selected.code === normalizedCode && (
         <button type="button" onClick={() => { void deliver(); }}>Confirmar entrega</button>
       )}
       <button type="button" onClick={() => { void refresh(); }}>Actualizar</button>

@@ -1,6 +1,6 @@
-# SALTEÑANGA — Fases 1, 2 y 3: tienda, cajero y administración
+# SALTEÑANGA — Fases 1, 2, 3 y 4: tienda, cajero, administración y comprobantes
 
-Tienda online para clientes y panel interno: catálogo en Bs, carrito persistente, pedidos con código e historial, gestión del cajero con cambio de estados y entrega, y administración de productos, inventario y reportes.
+Tienda online para clientes y panel interno: catálogo en Bs, carrito persistente, pedidos con código e historial, gestión del cajero con cambio de estados y entrega, administración de productos, inventario y reportes, y comprobante imprimible con QR de entrega.
 
 ## Arquitectura
 
@@ -88,6 +88,7 @@ El script es idempotente: si el correo ya existe, lo promueve a ADMIN. Después 
 - Código de pedido: `SAL-AAAAMMDD-####`.
 - Método de pago: Efectivo, QR o Transferencia (solo se registra; sin cobro online). `TARJETA` existe en la BD pero la API la rechaza.
 - El cliente puede cancelar solo mientras el pedido esté `PENDIENTE` y no haya vencido; si no, debe llamar al local.
+- El comprobante se descarga desde `/order/<código>/comprobante` (imprimir o guardar como PDF). El QR codifica solo el código `SAL-AAAAMMDD-####` para que el cajero lo lea como teclado; no es un QR de cobro.
 
 ## Pruebas
 
@@ -121,7 +122,6 @@ Con Docker, esa variable debe estar en `.env` al recrear el contenedor `api` (la
 
 ## Fases pendientes
 
-- Fase 4: QR/transferencia y descarga de comprobantes.
 - Fase 5: despliegue con HTTPS, rendimiento y disponibilidad.
 
 **No hacer push a GitHub sin la aprobación final del usuario.**
