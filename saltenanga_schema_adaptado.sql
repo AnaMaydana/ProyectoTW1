@@ -108,6 +108,8 @@ ALTER TABLE pedido ADD CONSTRAINT chk_pedido_cliente CHECK (
       AND NULLIF(BTRIM(cliente_celular), '') IS NOT NULL)
 );
 CREATE INDEX idx_pedido_expiracion ON pedido(fecha_expiracion);
+ALTER TABLE pedido ADD COLUMN id_cajero INT NULL REFERENCES usuario(id_usuario);
+ALTER TABLE pedido ADD COLUMN fecha_entrega TIMESTAMPTZ;
 
 ALTER TABLE inventario ADD COLUMN disponible_hoy BOOLEAN NOT NULL DEFAULT TRUE;
 
