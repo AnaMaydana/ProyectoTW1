@@ -6,7 +6,10 @@ export function loadEnv() {
   return {
     databaseUrl: process.env.DATABASE_URL!,
     jwtSecret: process.env.JWT_SECRET!,
-    corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+    // WEB_ORIGIN gana cuando la web se sirve desde www.$DOMAIN (Vercel).
+    // Se usa || (no ??) para que un WEB_ORIGIN= vacío se trate como no definido,
+    // igual que ${WEB_ORIGIN:-...} en docker-compose.yml.
+    corsOrigin: process.env.WEB_ORIGIN || process.env.CORS_ORIGIN || 'http://localhost:3000',
     cartDays: Number(process.env.CART_COOKIE_DAYS ?? 30),
     refreshDays: Number(process.env.SESSION_REFRESH_DAYS ?? 30)
   };
