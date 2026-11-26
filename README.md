@@ -1,6 +1,6 @@
-# SALTEÑANGA — Fase 1: cliente y pedidos
+# SALTEÑANGA — Fases 1, 2 y 3: tienda, cajero y administración
 
-Tienda online para clientes: catálogo en Bs, carrito persistente, login con cookies persistentes, pedidos para recoger el mismo día con código, historial, repetir y cancelar.
+Tienda online para clientes y panel interno: catálogo en Bs, carrito persistente, pedidos con código e historial, gestión del cajero con cambio de estados y entrega, y administración de productos, inventario y reportes.
 
 ## Arquitectura
 
@@ -46,7 +46,7 @@ node scripts/verify-schema.mjs
 node scripts/verify-db.mjs
 ```
 
-`saltenanga_schema.sql` se conserva con el contenido exacto entregado. `saltenanga_schema_adaptado.sql` mantiene esos nombres de tablas y columnas y agrega: carrito, datos de cliente invitado, vencimiento, disponibilidad del día y consistencia de subtotal.
+`saltenanga_schema.sql` se conserva con el contenido exacto entregado. `saltenanga_schema_adaptado.sql` mantiene esos nombres de tablas y columnas y agrega: carrito, datos de cliente invitado, vencimiento, disponibilidad del día, consistencia de subtotal, cajero y fecha de entrega.
 
 `supabase/migrations/0002_rls_policies.sql` habilita RLS en las 12 tablas: lectura pública de solo filas activas del catálogo (`categoria`, `producto`, `inventario`, `metodo_pago`) y acceso denegado a `anon`/`authenticated` en el resto. El rol de la API (`saltenanga_app`) tiene políticas `app_acceso` en las 12 tablas; `anon`/`authenticated` siguen sin acceso a datos de negocio. `supabase/migrations/0001_init.sql` pertenece al modelo anterior y no se aplica.
 
@@ -77,7 +77,7 @@ Con `ADMIN_EMAIL` y `ADMIN_PASSWORD` definidos en `.env`:
 node --env-file=.env scripts/create-admin.mjs
 ```
 
-El script es idempotente: si el correo ya existe, lo promueve a ADMIN. Después iniciá sesión con ese correo y vas a ver el enlace "Administración" en la navegación.
+El script es idempotente: si el correo ya existe, lo promueve a ADMIN. Después iniciá sesión con ese correo y vas a ver el enlace "Administración" en la navegación. Ese mismo usuario puede operar `/cashier`; el enlace "Cajero" aparece para `CAJERO` y `ADMIN`.
 
 ## Reglas de negocio
 
@@ -106,9 +106,9 @@ npx playwright install chromium
 npm -w apps/web run e2e
 ```
 
-Los tres proyectos de Playwright cubren 360×800, 768×1024 y 1366×768: registro, carrito persistente al cerrar el navegador, checkout y código de pedido. Cada corrida crea un usuario y un pedido reales en Supabase.
+Los tres proyectos de Playwright cubren 360×800, 768×1024 y 1366×768: registro, carrito persistente al cerrar el navegador, checkout y código de pedido, administración y entrega del cajero. Cada corrida crea un usuario y un pedido reales en Supabase.
 
-El spec `admin.spec.ts` requiere `E2E_ADMIN_EMAIL` y `E2E_ADMIN_PASSWORD` (credenciales creadas con `scripts/create-admin.mjs`). Si no están definidas, se omite.
+El spec `admin.spec.ts` requiere `E2E_ADMIN_EMAIL` y `E2E_ADMIN_PASSWORD` (credenciales creadas con `scripts/create-admin.mjs`). Si no están definidas, se omite. `cashier.spec.ts` usa las mismas variables y se omite si no están definidas. Crea un cliente y un pedido reales durante la corrida.
 
 Si se ejecutan fuera del horario 06:00–11:00, fijar el reloj del negocio solo para la corrida (se ignora cuando `NODE_ENV=production`):
 
@@ -121,8 +121,6 @@ Con Docker, esa variable debe estar en `.env` al recrear el contenedor `api` (la
 
 ## Fases pendientes
 
-- Fase 2: panel del cajero, realtime, cambio de estados y entrega.
-- Fase 3: administración de productos, inventario y reportes.
 - Fase 4: QR/transferencia y descarga de comprobantes.
 - Fase 5: despliegue con HTTPS, rendimiento y disponibilidad.
 
