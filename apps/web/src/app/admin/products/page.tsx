@@ -77,7 +77,11 @@ export default function AdminProducts() {
     reader.readAsDataURL(file);
   };
 
-  const removePhoto = () => setForm((current) => ({ ...current, fotoUrl: null }));
+  const removePhoto = () => {
+    setForm((current) => ({ ...current, fotoUrl: null }));
+    const fileInput = document.getElementById('producto-foto') as HTMLInputElement | null;
+    if (fileInput) fileInput.value = '';
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -165,21 +169,13 @@ export default function AdminProducts() {
         <label>Precio Bs<input type="number" min="0" step="0.01" value={form.precio} onChange={(e) => setForm({ ...form, precio: e.target.value })} required /></label>
         <label>Stock<input type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} /></label>
         <div className="photo-field">
-          <label htmlFor="producto-foto">Foto del producto</label>
+          <label htmlFor="producto-foto">Foto del producto (subir desde tu equipo)</label>
           <input
-            id="producto-foto" type="file"
+            id="producto-foto"
+            type="file"
             accept="image/jpeg,image/png,image/webp"
             onChange={onPhotoChange}
           />
-          <label style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.35rem' }}>
-            O introduce una URL de imagen:
-            <input
-              type="url"
-              placeholder="https://..."
-              value={form.fotoUrl ?? ''}
-              onChange={(e) => setForm({ ...form, fotoUrl: e.target.value || null })}
-            />
-          </label>
           {uploading && <p>Subiendo foto…</p>}
           {form.fotoUrl && (
             <div className="photo-actions">

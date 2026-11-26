@@ -157,15 +157,34 @@ export class AdminCatalogService {
       if (!category.rowCount) throw new NotFoundException('Categoría no encontrada');
       await this.ensureUnique('producto', dto.nombre, undefined, client);
 
+      try {
+        await client.query(
+          "SELECT setval('producto_id_producto_seq', GREATEST(COALESCE((SELECT MAX(id_producto) FROM producto), 0), 1))"
+        );
+      } catch {
+        // En caso de que la secuencia se llame diferente o ya esté sincronizada
+      }
+
       const inserted = await client.query<{ id_producto: number }>(
         `INSERT INTO producto (id_categoria, nombre, descripcion, precio, foto_url, activo)
          VALUES ($1,$2,$3,$4,$5,TRUE) RETURNING id_producto`,
         [dto.idCategoria, dto.nombre, dto.descripcion ?? null, dto.precio.toFixed(2), dto.fotoUrl ?? null]
       );
+
+      try {
+        await client.query(
+          "SELECT setval('inventario_id_inventario_seq', GREATEST(COALESCE((SELECT MAX(id_inventario) FROM inventario), 0), 1))"
+        );
+      } catch {
+        // En caso de que la secuencia se llame diferente o ya esté sincronizada
+      }
+
       await client.query(
         `INSERT INTO inventario (id_producto, stock, disponible, disponible_hoy)
-         VALUES ($1,$2,TRUE,$3)`,
-        [inserted.rows[0].id_producto, dto.stock ?? 0, dto.disponibleHoy ?? false]
+         VALUES ($1,$2,TRUE,$3)
+         ON CONFLICT (id_producto) DO UPDATE
+         SET stock = EXCLUDED.stock, disponible_hoy = EXCLUDED.disponible_hoy`,
+        [inserted.rows[0].id_producto, dto.stock ?? 0, dto.disponibleHoy ?? true]
       );
       return this.oneProduct(inserted.rows[0].id_producto, client);
     });

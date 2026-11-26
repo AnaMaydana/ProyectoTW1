@@ -29,7 +29,7 @@ export class AdminExceptionFilter implements ExceptionFilter {
     const detail = exception instanceof Error ? exception.message : 'desconocido';
     this.logger.error(`Error de BD en ${req.method} ${req.originalUrl ?? req.url}: ${detail}`);
     res.status(502).json({
-      message: 'Error de base de datos', error: 'Bad Gateway', statusCode: 502
+      message: `Error de base de datos: ${detail}`, error: 'Bad Gateway', statusCode: 502
     });
   }
 }
