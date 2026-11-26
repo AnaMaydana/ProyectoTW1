@@ -85,7 +85,7 @@ Se monta read-only en `/etc/caddy/Caddyfile`; el volumen `caddy_data` conserva c
 
 ### 3. Dockerfiles (modificar) y `.dockerignore` (nuevo en la raíz)
 
-- `apps/api/Dockerfile`: etapas `deps` (`npm ci` con `package.json` + `package-lock.json` + `apps/api/package.json` de la raíz), `build` (`npm -w api run build`) y `runtime` (`node:20-alpine`, usuario `node`, copia de `dist` y dependencias de producción, `CMD ["node", "dist/main.js"]`).
+- `apps/api/Dockerfile`: etapas `deps` (`npm ci` con `package.json` + `package-lock.json` + los `package.json` de ambos workspaces de la raíz), `build` (`npm -w api run build`) y `runtime` (`node:20-alpine`, usuario `node`, copia de `dist` y dependencias de producción, `CMD ["node", "dist/src/main.js"]`). El `tsconfig.json` actual compila `src` y `test`, así que `nest build` deja el entrypoint en `dist/src/main.js`, no en `dist/main.js`.
 - `apps/web/Dockerfile`: etapas `deps`, `build` (recibe `ARG NEXT_PUBLIC_API_URL` y corre `npm -w web run build`) y `runtime` (usuario `node`, copia `.next`, `public`, dependencias de producción, `CMD ["npm", "run", "start"]` con `next start -p 3000`).
 - `.dockerignore` en la raíz excluye `node_modules`, `apps/*/.next`, `apps/api/dist`, `.env`, `.git`, `.superpowers`, `test-results`, `playwright-report`, `*.log` y cobertura.
 
@@ -95,7 +95,7 @@ Se monta read-only en `/etc/caddy/Caddyfile`; el volumen `caddy_data` conserva c
 - `apps/api/src/health/health.module.ts` y su import en `app.module.ts`.
 - `apps/api/src/health/health.controller.spec.ts` con TDD: verifica el status 200 y el payload.
 - `apps/api/src/main.ts`: `app.enableShutdownHooks()` antes de `listen`.
-- Scripts: `apps/api/package.json` → `"start:prod": "node dist/main.js"`; `apps/web/package.json` → `"start": "next start -p 3000"`.
+- Scripts: `apps/api/package.json` → `"start:prod": "node dist/src/main.js"` (ruta real generada por `nest build` con el `tsconfig.json` actual); `apps/web/package.json` → `"start": "next start -p 3000"`.
 
 ### 5. Variables y documentación
 
