@@ -6,8 +6,9 @@ import { CartModule } from './cart/cart.module';
 import { OrdersModule } from './orders/orders.module';
 import { AdminModule } from './admin/admin.module';
 import { CashierModule } from './cashier/cashier.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, ProductsModule, CartModule, OrdersModule, AdminModule, CashierModule]
+  imports: [DatabaseModule, AuthModule, ProductsModule, CartModule, OrdersModule, AdminModule, CashierModule, HealthModule]
 })
 export class AppModule {}
