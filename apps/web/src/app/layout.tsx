@@ -13,15 +13,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es">
       <body>
+        <a className="skip-link" href="#principal">Saltar al contenido</a>
         <header className="site-header">
-          <strong>{business.name}</strong>
-          <nav>
+          <strong className="header-brand">{business.name}</strong>
+          <nav aria-label="Navegación principal">
             <a href="/menu">Menú</a>
             <a href="/orders">Mis pedidos</a>
             <AuthNav />
           </nav>
         </header>
-        <CartProvider>{children}</CartProvider>
+        <CartProvider><div id="principal">{children}</div></CartProvider>
       </body>
     </html>
   );

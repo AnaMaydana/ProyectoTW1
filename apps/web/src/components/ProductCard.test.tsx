@@ -26,4 +26,11 @@ describe('ProductCard', () => {
     expect(screen.queryByText(/Agotado hoy/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Agregar/i })).toBeEnabled();
   });
+
+  it('usa botón no submit y clase de precio para el nuevo estilo', () => {
+    render(<ProductCard product={{ ...product, availableToday: true }} />);
+    const boton = screen.getByRole('button', { name: /Agregar/i }) as HTMLButtonElement;
+    expect(boton.type).toBe('button');
+    expect(screen.getByText(/Bs 12\.00/)).toHaveClass('precio');
+  });
 });

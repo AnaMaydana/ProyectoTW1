@@ -22,10 +22,10 @@ export function ProductCard({ product }: { product: Product }) {
       />
       <h3>{product.name}</h3>
       <p>{product.description}</p>
-      <strong>Bs {product.priceBs}</strong>
+      <strong className="precio">Bs {product.priceBs}</strong>
       {!product.availableToday && <span className="badge">Agotado hoy</span>}
-      <div>
-        <button onClick={add} disabled={!product.availableToday}>
+      <div className="card-actions">
+        <button type="button" onClick={add} disabled={!product.availableToday}>
           Agregar
         </button>
       </div>

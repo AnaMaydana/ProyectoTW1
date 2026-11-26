@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { expect, test } from '@playwright/test';
 
 const email = process.env.E2E_ADMIN_EMAIL ?? '';
@@ -5,7 +6,7 @@ const password = process.env.E2E_ADMIN_PASSWORD ?? '';
 
 test('admin crea y desactiva un producto', async ({ page }) => {
   test.skip(!email || !password, 'Requiere E2E_ADMIN_EMAIL y E2E_ADMIN_PASSWORD');
-  const suffix = Date.now().toString().slice(-6);
+  const suffix = randomUUID().slice(0, 8);
 
   await page.goto('/login', { waitUntil: 'networkidle' });
   await page.getByLabel('Correo').fill(email);

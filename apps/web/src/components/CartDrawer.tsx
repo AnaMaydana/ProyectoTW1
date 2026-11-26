@@ -38,15 +38,15 @@ export function CartDrawer({
           <div key={item.productId}>
             <span>{item.name}</span> <span>{item.quantity}</span>{' '}
             <strong>Bs {item.subtotalBs}</strong>{' '}
-            <button aria-label="+" onClick={() => increase(item.productId, item.quantity)}>
+            <button type="button" aria-label="+" onClick={() => increase(item.productId, item.quantity)}>
               +
             </button>{' '}
-            <button onClick={() => remove(item.productId)}>Quitar</button>
+            <button type="button" onClick={() => remove(item.productId)}>Quitar</button>
           </div>
         ))
       )}
       <p>Total: Bs {initialCart.totalBs}</p>
-      <a href="/checkout">Confirmar pedido</a>
+      <a className="button-link" href="/checkout">Confirmar pedido</a>
     </aside>
   );
 }
