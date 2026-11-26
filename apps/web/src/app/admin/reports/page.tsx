@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import { ReportRow } from '../../../lib/types';
 
+const HEADERS: Record<string, string> = {
+  fecha: 'Fecha', pedidos: 'Pedidos', totalBs: 'Total Bs',
+  productId: 'Producto', nombre: 'Nombre', unidades: 'Unidades',
+  estado: 'Estado', stock: 'Stock'
+};
+
 export default function AdminReports() {
   const [sales, setSales] = useState<ReportRow[]>([]);
   const [top, setTop] = useState<ReportRow[]>([]);
@@ -22,12 +28,14 @@ export default function AdminReports() {
     return (
       <section key={title}>
         <h2>{title}</h2>
-        <table>
-          <thead><tr>{keys.map((k) => <th key={k}>{k}</th>)}</tr></thead>
-          <tbody>{rows.map((row, i) => (
-            <tr key={i}>{keys.map((k) => <td key={k}>{String(row[k])}</td>)}</tr>
-          ))}</tbody>
-        </table>
+        <div className="table-scroll">
+          <table>
+            <thead><tr>{keys.map((k) => <th key={k}>{HEADERS[k] ?? k}</th>)}</tr></thead>
+            <tbody>{rows.map((row, i) => (
+              <tr key={i}>{keys.map((k) => <td key={k}>{String(row[k])}</td>)}</tr>
+            ))}</tbody>
+          </table>
+        </div>
       </section>
     );
   }

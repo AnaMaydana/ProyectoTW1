@@ -16,6 +16,8 @@ test('admin crea y desactiva un producto', async ({ page }) => {
 
   await page.goto('/admin/products', { waitUntil: 'networkidle' });
   await expect(page.getByRole('heading', { name: 'Productos' })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
   await page.getByRole('combobox', { name: 'Categoría' }).selectOption({ index: 1 });
   await page.getByLabel('Nombre').fill(`Prueba ${suffix}`);
   await page.getByLabel('Precio Bs').fill('9.50');
@@ -24,6 +26,11 @@ test('admin crea y desactiva un producto', async ({ page }) => {
   await expect(page.getByText(`Prueba ${suffix}`)).toBeVisible();
 
   const row = page.getByRole('row').filter({ hasText: `Prueba ${suffix}` });
+  page.once('dialog', (dialog) => dialog.accept());
   await row.getByRole('button', { name: 'Desactivar' }).click();
   await expect(row.getByText('Inactivo')).toBeVisible();
+
+  await page.goto('/admin/inventory', { waitUntil: 'networkidle' });
+  const inventoryRow = page.getByRole('row').filter({ hasText: `Prueba ${suffix}` });
+  await expect(inventoryRow.getByText('Stock bajo')).toBeVisible();
 });

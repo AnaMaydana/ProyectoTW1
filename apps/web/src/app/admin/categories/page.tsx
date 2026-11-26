@@ -24,10 +24,17 @@ export default function AdminCategories() {
   };
 
   const toggle = async (category: AdminCategory) => {
-    await api(`/admin/categories/${category.id}`, {
-      method: 'PATCH', body: JSON.stringify({ activa: !category.activa })
-    });
-    load();
+    if (category.activa &&
+        !window.confirm(`¿Desactivar la categoría "${category.nombre}"?`)) return;
+    setError('');
+    try {
+      await api(`/admin/categories/${category.id}`, {
+        method: 'PATCH', body: JSON.stringify({ activa: !category.activa })
+      });
+      load();
+    } catch {
+      setError('No se pudo actualizar la categoría');
+    }
   };
 
   return (

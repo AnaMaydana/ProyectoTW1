@@ -67,3 +67,45 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 label { display: block; margin: 0.75rem 0; }
 
 .alert { color: #7a1f1f; font-weight: 700; }
+
+.admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.admin-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  color: #7a1f1f;
+  font-weight: 700;
+}
+
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.table-scroll table { border-collapse: collapse; width: 100%; }
+.table-scroll th, .table-scroll td {
+  padding: 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+  white-space: nowrap;
+}
+.table-scroll th { background: #f6e8d8; }
+
+.low-stock { background: #fff3f3; }
+.badge { margin-left: 0.5rem; }
+
+@media (max-width: 600px) {
+  main { padding: 0.75rem; }
+  .table-scroll th, .table-scroll td { padding: 0.4rem; font-size: 0.875rem; }
+  .admin-nav a { padding: 0.5rem; }
+}

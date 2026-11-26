@@ -38,10 +38,16 @@ export default function AdminProducts() {
   };
 
   const deactivate = async (product: AdminProduct) => {
-    await api(`/admin/products/${product.id}`, {
-      method: 'PATCH', body: JSON.stringify({ activo: false, disponibleHoy: false })
-    });
-    load();
+    if (!window.confirm(`¿Desactivar "${product.nombre}"? Dejará de estar disponible.`)) return;
+    setError('');
+    try {
+      await api(`/admin/products/${product.id}`, {
+        method: 'PATCH', body: JSON.stringify({ activo: false, disponibleHoy: false })
+      });
+      load();
+    } catch {
+      setError('No se pudo desactivar el producto');
+    }
   };
 
   return (
@@ -60,6 +66,7 @@ export default function AdminProducts() {
         <button type="submit">{editing ? 'Guardar cambios' : 'Crear producto'}</button>
       </form>
       {error && <p role="alert">{error}</p>}
+      <div className="table-scroll">
       <table>
         <thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Estado</th><th></th></tr></thead>
         <tbody>
@@ -75,6 +82,7 @@ export default function AdminProducts() {
           ))}
         </tbody>
       </table>
+      </div>
     </section>
   );
 }
