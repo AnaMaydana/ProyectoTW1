@@ -27,21 +27,20 @@ describe('AdminCatalogService', () => {
     client.query
       .mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 }) // SELECT categoria
       .mockResolvedValueOnce({ rows: [{ id_producto: 7 }] })    // INSERT producto
-      .mockResolvedValueOnce({ rows: [] });                     // INSERT inventario
-    (db.transaction as jest.Mock).mockImplementation((work: any) => work(client));
-    (db.query as jest.Mock)
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 })         // ensureUnique
+      .mockResolvedValueOnce({ rows: [] })                      // INSERT inventario
       .mockResolvedValueOnce({
         rows: [{ id_producto: 7, id_categoria: 1, categoria: 'Salteñas', nombre: 'Carne',
                  precio: '12.00', foto_url: null, activo: true, stock: 0, disponible_hoy: false }]
-      });                                                      // oneProduct
+      });                                                      // oneProduct EN la transacción
+    (db.transaction as jest.Mock).mockImplementation((work: any) => work(client));
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [], rowCount: 0 }); // ensureUnique
 
     const product = await service.createProduct({
       idCategoria: 1, nombre: 'Carne', precio: 12
     });
 
     expect((db.transaction as jest.Mock)).toHaveBeenCalledTimes(1);
-    expect(client.query).toHaveBeenCalledTimes(3);
+    expect(client.query).toHaveBeenCalledTimes(4);
     expect(product).toMatchObject({ id: '7', stock: 0, disponibleHoy: false, precio: '12.00' });
   });
 

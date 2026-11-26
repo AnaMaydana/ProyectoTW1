@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common';
+import { QueryResultRow } from 'pg';
 import { DatabaseService } from '../database/database.service';
 
 export interface AdminCategory {
@@ -37,6 +38,10 @@ interface ProductRow {
 interface InventoryRow {
   id_inventario: number; id_producto: number; nombre: string;
   stock: number; disponible_hoy: boolean;
+}
+
+interface QueryRunner {
+  query<T extends QueryResultRow = any>(text: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
 const productSelect = `
@@ -80,8 +85,8 @@ export class AdminCatalogService {
     };
   }
 
-  private async oneProduct(id: number): Promise<AdminProduct> {
-    const result = await this.db.query<ProductRow>(`${productSelect} WHERE p.id_producto = $1`, [id]);
+  private async oneProduct(id: number, runner: QueryRunner = this.db): Promise<AdminProduct> {
+    const result = await runner.query<ProductRow>(`${productSelect} WHERE p.id_producto = $1`, [id]);
     if (!result.rows.length) throw new NotFoundException('Producto no encontrado');
     return this.toProduct(result.rows[0]);
   }
@@ -146,7 +151,7 @@ export class AdminCatalogService {
          VALUES ($1,$2,TRUE,$3)`,
         [inserted.rows[0].id_producto, dto.stock ?? 0, dto.disponibleHoy ?? false]
       );
-      return this.oneProduct(inserted.rows[0].id_producto);
+      return this.oneProduct(inserted.rows[0].id_producto, client);
     });
   }
 
