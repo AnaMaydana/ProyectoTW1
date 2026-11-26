@@ -22,7 +22,7 @@ Dejar el repositorio listo para desplegar SALTEÑANGA en un VPS con Docker Compo
 
 ---
 
-## Tarea 1 — Endpoint `/health`, apagado ordenado y script de arranque de la API (TDD)
+## Task 1 — Endpoint `/health`, apagado ordenado y script de arranque de la API (TDD)
 
 **Archivos:**
 - `apps/api/src/health/health.controller.spec.ts` (nuevo)
@@ -134,7 +134,7 @@ git commit -m "feat: endpoint /health y apagado ordenado de la API"
 
 ---
 
-## Tarea 2 — Arranque de producción de Web y confianza TLS condicional en E2E
+## Task 2 — Arranque de producción de Web y confianza TLS condicional en E2E
 
 **Archivos:**
 - `apps/web/package.json` (modificar)
@@ -226,7 +226,7 @@ git commit -m "feat: arranque de produccion de web y E2E sobre HTTPS local"
 
 ---
 
-## Tarea 3 — Dockerfiles multi-etapa y `.dockerignore`
+## Task 3 — Dockerfiles multi-etapa y `.dockerignore`
 
 **Archivos:**
 - `.dockerignore` (nuevo en la raíz)
@@ -348,7 +348,7 @@ git commit -m "build: Dockerfiles de produccion multi-etapa y .dockerignore"
 
 ---
 
-## Tarea 4 — Caddy, Compose y variables parametrizadas por `DOMAIN`
+## Task 4 — Caddy, Compose y variables parametrizadas por `DOMAIN`
 
 **Archivos:**
 - `deploy/Caddyfile` (nuevo)
@@ -489,7 +489,7 @@ git commit -m "deploy: Caddy como unico origen HTTPS con healthchecks y restart"
 
 ---
 
-## Tarea 5 — Overlay de verificación E2E contra HTTPS
+## Task 5 — Overlay de verificación E2E contra HTTPS
 
 **Archivos:**
 - `deploy/docker-compose.e2e.yml` (nuevo)
@@ -525,7 +525,7 @@ git commit -m "test: overlay local para E2E sobre el stack HTTPS"
 
 ---
 
-## Tarea 6 — Documentación de despliegue en VPS
+## Task 6 — Documentación de despliegue en VPS
 
 **Archivos:**
 - `README.md` (modificar)
@@ -626,7 +626,7 @@ git commit -m "docs: guia de despliegue en VPS y cierre de la fase 5"
 
 ---
 
-## Tarea 7 — Verificación completa (sin cambios de código esperados)
+## Task 7 — Verificación completa (sin cambios de código esperados)
 
 Ejecutar en este orden y anotar la salida real de cada comando. Si algo falla, corregir en la tarea correspondiente y hacer un commit nuevo; no reescribir la historia.
 
