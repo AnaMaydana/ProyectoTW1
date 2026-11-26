@@ -54,7 +54,7 @@ Una sola dependencia nueva, en `apps/web`: `qrcode.react`. Se usa el componente 
 | `apps/web/src/components/CashierOrders.tsx` | Etiqueta del input y normalización del código escaneado. |
 | `apps/web/src/components/CashierOrders.test.tsx` | Cubrir la normalización. |
 | `apps/web/e2e/cashier.spec.ts` | Extender el flujo con QR y comprobante imprimible. |
-| `apps/web/src/app/globals.css` (o el equivalente de estilos que corresponda) | Reglas `@media print` y estilo del QR. |
+| `apps/web/src/app/globals.css` | Reglas `@media print` y estilo del QR. |
 
 `apps/api` y los archivos SQL no se modifican.
 
