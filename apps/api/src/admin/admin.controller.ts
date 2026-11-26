@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, Logger, Param, Patch, Post, Query, Req, UseFilters, UseGuards
+  Body, Controller, Delete, Get, Logger, Param, Patch, Post, Query, Req, UseFilters, UseGuards
 } from '@nestjs/common';
 import { Request } from 'express';
 import { lowStockThreshold } from '../config/env';
@@ -67,6 +67,13 @@ export class AdminController {
     const product = await this.catalog.updateProduct(Number(id), dto);
     this.audit(req, 'editar_producto');
     return { product };
+  }
+
+  @Delete('products/:id')
+  async deleteProduct(@Req() req: Request, @Param('id') id: string) {
+    const result = await this.catalog.deleteProduct(Number(id));
+    this.audit(req, 'eliminar_producto');
+    return result;
   }
 
   @Get('inventory')

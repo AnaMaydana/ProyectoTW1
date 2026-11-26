@@ -29,24 +29,66 @@ export function CartDrawer({
   };
 
   return (
-    <aside className="card" aria-label="Tu carrito">
-      <h2>Tu carrito</h2>
+    <aside className="card cart-drawer" aria-label="Tu carrito">
+      <div className="cart-header">
+        <h2>Tu carrito</h2>
+        {initialCart.items.length > 0 && (
+          <span className="cart-badge-count">
+            {initialCart.items.reduce((acc, i) => acc + i.quantity, 0)} items
+          </span>
+        )}
+      </div>
+
       {initialCart.items.length === 0 ? (
-        <p>Tu carrito está vacío</p>
+        <div className="cart-empty-state">
+          <p>Tu carrito está vacío</p>
+          <span className="cart-empty-hint">
+            Agrega salteñas o bebidas para armar tu pedido.
+          </span>
+        </div>
       ) : (
-        initialCart.items.map((item) => (
-          <div key={item.productId}>
-            <span>{item.name}</span> <span>{item.quantity}</span>{' '}
-            <strong>Bs {item.subtotalBs}</strong>{' '}
-            <button aria-label="+" onClick={() => increase(item.productId, item.quantity)}>
-              +
-            </button>{' '}
-            <button onClick={() => remove(item.productId)}>Quitar</button>
-          </div>
-        ))
+        <div className="cart-items-list">
+          {initialCart.items.map((item) => (
+            <div key={item.productId} className="cart-item-row">
+              <div className="cart-item-info">
+                <span className="cart-item-name">{item.name}</span>
+                <span className="cart-item-qty">Cant: {item.quantity}</span>
+              </div>
+              <strong className="cart-item-subtotal">Bs {item.subtotalBs}</strong>
+              <div className="cart-item-actions">
+                <button
+                  type="button"
+                  className="btn-cart-circle"
+                  aria-label="+"
+                  onClick={() => increase(item.productId, item.quantity)}
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  className="btn-cart-remove"
+                  onClick={() => remove(item.productId)}
+                >
+                  Quitar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
-      <p>Total: Bs {initialCart.totalBs}</p>
-      <a href="/checkout">Confirmar pedido</a>
+
+      <div className="cart-footer">
+        <p className="cart-total-text">Total: Bs {initialCart.totalBs}</p>
+        {initialCart.items.length > 0 ? (
+          <a href="/checkout" className="btn btn-primary btn-block text-center">
+            Confirmar pedido
+          </a>
+        ) : (
+          <button className="btn btn-secondary btn-block" disabled>
+            Confirmar pedido
+          </button>
+        )}
+      </div>
     </aside>
   );
 }

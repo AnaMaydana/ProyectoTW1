@@ -54,4 +54,26 @@ describe('AdminProducts', () => {
       'No se pudo cargar la lista de productos'
     );
   });
+
+  it('permite eliminar producto con confirmación', async () => {
+    const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<AdminProducts />);
+    const deleteBtn = await screen.findByRole('button', { name: 'Eliminar' });
+    fireEvent.click(deleteBtn);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(api).toHaveBeenCalledWith('/admin/products/7', { method: 'DELETE' });
+  });
+
+  it('permite entrar en modo edición y luego cancelar', async () => {
+    render(<AdminProducts />);
+    const editBtn = await screen.findByRole('button', { name: 'Editar' });
+    fireEvent.click(editBtn);
+
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeInTheDocument();
+    const cancelBtn = screen.getByRole('button', { name: 'Cancelar edición' });
+    expect(cancelBtn).toBeInTheDocument();
+
+    fireEvent.click(cancelBtn);
+    expect(screen.getByRole('button', { name: 'Crear producto' })).toBeInTheDocument();
+  });
 });

@@ -90,4 +90,33 @@ describe('AdminCatalogService', () => {
       else process.env.LOW_STOCK_THRESHOLD = previous;
     }
   });
+
+  it('elimina producto y sus dependencias en transaccion si no tiene pedidos', async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [], rowCount: 1 }) };
+    (db.query as jest.Mock)
+      .mockResolvedValueOnce({ rows: [{ nombre: 'Salteña' }], rowCount: 1 }) // SELECT producto
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });                    // SELECT detalle_pedido
+    (db.transaction as jest.Mock).mockImplementation((work: any) => work(client));
+
+    const result = await service.deleteProduct('5');
+    expect(result.deleted).toBe(true);
+    expect(client.query).toHaveBeenCalledTimes(3);
+  });
+
+  it('desactiva producto si tiene pedidos asociados en historial', async () => {
+    (db.query as jest.Mock)
+      .mockResolvedValueOnce({ rows: [{ nombre: 'Salteña' }], rowCount: 1 }) // SELECT producto
+      .mockResolvedValueOnce({ rows: [{ 1: 1 }], rowCount: 1 })             // SELECT detalle_pedido (tiene pedidos)
+      .mockResolvedValueOnce({ rows: [] })                                  // UPDATE producto
+      .mockResolvedValueOnce({ rows: [] });                                 // UPDATE inventario
+
+    const result = await service.deleteProduct('5');
+    expect(result.deleted).toBe(true);
+    expect(result.message).toContain('desactivado');
+  });
+
+  it('404 al intentar eliminar producto inexistente', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    await expect(service.deleteProduct('99')).rejects.toBeInstanceOf(NotFoundException);
+  });
 });

@@ -13,6 +13,7 @@ export interface AdminCategory {
 }
 export interface AdminProduct {
   id: string; idCategoria: string; categoria: string; nombre: string;
+  descripcion?: string | null;
   precio: string; fotoUrl: string | null; activo: boolean;
   stock: number; disponibleHoy: boolean;
 }
@@ -33,6 +34,7 @@ interface CategoryRow {
 }
 interface ProductRow {
   id_producto: number; id_categoria: number; categoria: string; nombre: string;
+  descripcion: string | null;
   precio: string; foto_url: string | null; activo: boolean;
   stock: number | null; disponible_hoy: boolean;
 }
@@ -49,7 +51,7 @@ interface QueryRunner {
 
 const productSelect = `
   SELECT p.id_producto, c.id_categoria, c.nombre AS categoria, p.nombre,
-         p.precio, p.foto_url, p.activo, i.stock, i.disponible_hoy
+         p.descripcion, p.precio, p.foto_url, p.activo, i.stock, i.disponible_hoy
   FROM producto p
   JOIN categoria c ON c.id_categoria = p.id_categoria
   LEFT JOIN inventario i ON i.id_producto = p.id_producto`;
@@ -87,6 +89,7 @@ export class AdminCatalogService {
     return {
       id: String(row.id_producto), idCategoria: String(row.id_categoria),
       categoria: row.categoria, nombre: row.nombre,
+      descripcion: row.descripcion ?? '',
       precio: Number(row.precio).toFixed(2), fotoUrl: row.foto_url,
       activo: row.activo, stock: Number(row.stock ?? 0),
       disponibleHoy: Boolean(row.disponible_hoy)
@@ -194,6 +197,26 @@ export class AdminCatalogService {
       await this.db.query('UPDATE inventario SET disponible_hoy = $2 WHERE id_producto = $1', [productId, value]);
     }
     return this.oneProduct(productId);
+  }
+
+  async deleteProduct(id: string | number): Promise<{ deleted: boolean; message: string }> {
+    const productId = Number(id);
+    const current = await this.db.query('SELECT nombre FROM producto WHERE id_producto = $1', [productId]);
+    if (!current.rowCount) throw new NotFoundException('Producto no encontrado');
+
+    const inOrders = await this.db.query('SELECT 1 FROM detalle_pedido WHERE id_producto = $1 LIMIT 1', [productId]);
+    if (inOrders.rowCount) {
+      await this.db.query('UPDATE producto SET activo = FALSE WHERE id_producto = $1', [productId]);
+      await this.db.query('UPDATE inventario SET disponible_hoy = FALSE WHERE id_producto = $1', [productId]);
+      return { deleted: true, message: 'Producto desactivado para conservar el historial de pedidos' };
+    }
+
+    await this.db.transaction(async (client) => {
+      await client.query('DELETE FROM carrito_detalle WHERE id_producto = $1', [productId]);
+      await client.query('DELETE FROM inventario WHERE id_producto = $1', [productId]);
+      await client.query('DELETE FROM producto WHERE id_producto = $1', [productId]);
+    });
+    return { deleted: true, message: 'Producto eliminado correctamente' };
   }
 
   async listInventory(threshold = lowStockThreshold()): Promise<AdminInventoryItem[]> {

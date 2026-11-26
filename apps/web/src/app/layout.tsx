@@ -1,8 +1,13 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { business } from '../config/business';
 import { CartProvider } from '../components/CartProvider';
 import { AuthNav } from '../components/AuthNav';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1
+};
 
 export const metadata: Metadata = {
   title: business.name,

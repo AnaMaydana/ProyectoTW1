@@ -93,6 +93,7 @@ export interface AdminCategory {
 }
 export interface AdminProduct {
   id: string; idCategoria: string; categoria: string; nombre: string;
+  descripcion?: string | null;
   precio: string; fotoUrl: string | null; activo: boolean;
   stock: number; disponibleHoy: boolean;
 }

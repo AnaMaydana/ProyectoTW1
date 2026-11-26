@@ -13,21 +13,33 @@ export function ProductCard({ product }: { product: Product }) {
   };
 
   return (
-    <article className="card">
-      <img
-        src={product.imageUrl ?? 'https://placehold.co/600x400?text=Salteña'}
-        alt={product.name}
-        width={300}
-        height={200}
-      />
-      <h3>{product.name}</h3>
-      <p>{product.description}</p>
-      <strong>Bs {product.priceBs}</strong>
-      {!product.availableToday && <span className="badge">Agotado hoy</span>}
-      <div>
-        <button onClick={add} disabled={!product.availableToday}>
-          Agregar
-        </button>
+    <article className="card product-card">
+      <div className="product-media">
+        <img
+          src={product.imageUrl ?? 'https://placehold.co/600x400?text=Salteña'}
+          alt={product.name}
+          width={300}
+          height={200}
+          className="product-img"
+        />
+        {!product.availableToday && (
+          <span className="badge badge-out-stock">Agotado hoy</span>
+        )}
+      </div>
+      <div className="product-body">
+        <div className="product-category-label">{product.categoryName}</div>
+        <h3 className="product-name">{product.name}</h3>
+        <p className="product-desc">{product.description}</p>
+        <div className="product-footer">
+          <strong className="product-price">Bs {product.priceBs}</strong>
+          <button
+            className="btn btn-primary"
+            onClick={add}
+            disabled={!product.availableToday}
+          >
+            Agregar
+          </button>
+        </div>
       </div>
     </article>
   );
