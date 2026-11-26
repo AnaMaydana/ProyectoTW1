@@ -111,4 +111,35 @@ describe('OrdersService', () => {
     expect(result.skipped).toEqual(['Queso']);
     expect((db.query as jest.Mock).mock.calls[3][0]).toContain('ON CONFLICT');
   });
+
+  it('findOne y list incluyen el comprobante cuando existe', async () => {
+    (db.query as jest.Mock).mockResolvedValue({ rowCount: 1, rows: [
+      { ...orderRow, comprobante_numero: 'COM-20261124-0001', comprobante_fecha: '2026-11-24T14:55:00' }
+    ] });
+    const one = await service.findOne('9');
+    expect(one.comprobante).toEqual({ numero: 'COM-20261124-0001', fechaEmision: '2026-11-24T14:55:00' });
+    const list = await service.list('1');
+    expect(list[0].comprobante?.numero).toBe('COM-20261124-0001');
+  });
+
+  it('findPublicByCode da detalle y comprobante sin datos personales', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1, rows: [{
+      codigo: 'SAL-20261124-0001', estado: 'ENTREGADO', total: '24.00', pickup_time: '10:50',
+      items: [{ name: 'Carne', quantity: 2, unitPriceBs: '12.00' }],
+      comprobante_numero: 'COM-20261124-0001', comprobante_fecha: '2026-11-24T14:55:00'
+    }] });
+    const result = await service.findPublicByCode('SAL-20261124-0001');
+    expect(result).toEqual({
+      code: 'SAL-20261124-0001', status: 'ENTREGADO', totalBs: '24.00', pickupTime: '10:50',
+      items: [{ name: 'Carne', quantity: 2, unitPriceBs: '12.00' }],
+      comprobante: { numero: 'COM-20261124-0001', fechaEmision: '2026-11-24T14:55:00' }
+    });
+    expect(result).not.toHaveProperty('cliente_nombre');
+    expect(result).not.toHaveProperty('cliente_celular');
+  });
+
+  it('findPublicByCode devuelve 404 si no existe', async () => {
+    (db.query as jest.Mock).mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    await expect(service.findPublicByCode('SAL-20261124-9999')).rejects.toThrow('Pedido no encontrado');
+  });
 });

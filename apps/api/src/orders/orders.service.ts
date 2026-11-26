@@ -142,10 +142,13 @@ export class OrdersService {
               to_char(p.fecha_hora_recojo, 'HH24:MI') AS pickup_time,
               p.fecha_expiracion, p.fecha_creacion,
               mp.nombre AS payment_method,
+              c.numero AS comprobante_numero,
+              to_char(c.fecha_emision, 'YYYY-MM-DD"T"HH24:MI:SS') AS comprobante_fecha,
               d.id_producto, d.cantidad, d.precio_unitario, pr.nombre AS product_name
        FROM pedido p
        LEFT JOIN pago pg ON pg.id_pedido = p.id_pedido
        LEFT JOIN metodo_pago mp ON mp.id_metodo_pago = pg.id_metodo_pago
+       LEFT JOIN comprobante c ON c.id_pedido = p.id_pedido
        LEFT JOIN detalle_pedido d ON d.id_pedido = p.id_pedido
        LEFT JOIN producto pr ON pr.id_producto = d.id_producto
        WHERE p.id_pedido = $1`,
@@ -164,6 +167,9 @@ export class OrdersService {
       paymentMethod: first.payment_method ?? 'EFECTIVO',
       expiresAt: first.fecha_expiracion,
       createdAt: first.fecha_creacion,
+      comprobante: first.comprobante_numero
+        ? { numero: first.comprobante_numero, fechaEmision: first.comprobante_fecha }
+        : null,
       items: result.rows
         .filter((row) => row.id_producto != null)
         .map((row) => ({
@@ -179,10 +185,13 @@ export class OrdersService {
     const result = await this.db.query<any>(
       `SELECT p.id_pedido, p.codigo, p.total, p.estado,
               to_char(p.fecha_hora_recojo, 'HH24:MI') AS pickup_time,
-              mp.nombre AS payment_method, p.fecha_expiracion, p.fecha_creacion
+              mp.nombre AS payment_method, p.fecha_expiracion, p.fecha_creacion,
+              c.numero AS comprobante_numero,
+              to_char(c.fecha_emision, 'YYYY-MM-DD"T"HH24:MI:SS') AS comprobante_fecha
        FROM pedido p
        LEFT JOIN pago pg ON pg.id_pedido = p.id_pedido
        LEFT JOIN metodo_pago mp ON mp.id_metodo_pago = pg.id_metodo_pago
+       LEFT JOIN comprobante c ON c.id_pedido = p.id_pedido
        WHERE p.id_usuario = $1
        ORDER BY p.fecha_creacion DESC`,
       [Number(userId)]
@@ -195,8 +204,48 @@ export class OrdersService {
       pickupTime: order.pickup_time,
       paymentMethod: order.payment_method ?? 'EFECTIVO',
       expiresAt: order.fecha_expiracion,
-      createdAt: order.fecha_creacion
+      createdAt: order.fecha_creacion,
+      comprobante: order.comprobante_numero
+        ? { numero: order.comprobante_numero, fechaEmision: order.comprobante_fecha }
+        : null
     }));
+  }
+
+  async findPublicByCode(code: string) {
+    const result = await this.db.query<any>(
+      `SELECT p.codigo, p.estado, p.total,
+              to_char(p.fecha_hora_recojo, 'HH24:MI') AS pickup_time,
+              COALESCE(
+                (SELECT json_agg(json_build_object(
+                   'name', pr.nombre, 'quantity', d.cantidad, 'unitPriceBs', d.precio_unitario::text
+                 ) ORDER BY d.id_detalle)
+                 FROM detalle_pedido d JOIN producto pr ON pr.id_producto = d.id_producto
+                 WHERE d.id_pedido = p.id_pedido), '[]'::json) AS items,
+              c.numero AS comprobante_numero,
+              to_char(c.fecha_emision, 'YYYY-MM-DD"T"HH24:MI:SS') AS comprobante_fecha
+       FROM pedido p
+       LEFT JOIN comprobante c ON c.id_pedido = p.id_pedido
+       WHERE p.codigo = $1`,
+      [code]
+    );
+    if (!result.rowCount) throw new NotFoundException('Pedido no encontrado');
+    const row = result.rows[0];
+    return {
+      code: row.codigo,
+      status: row.estado,
+      totalBs: Number(row.total).toFixed(2),
+      pickupTime: row.pickup_time,
+      items: (row.items as Array<{ name: string; quantity: number; unitPriceBs: string }>).map(
+        (item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          unitPriceBs: Number(item.unitPriceBs).toFixed(2)
+        })
+      ),
+      comprobante: row.comprobante_numero
+        ? { numero: row.comprobante_numero, fechaEmision: row.comprobante_fecha }
+        : null
+    };
   }
 
   async repeat(userId: string, cartToken: string, orderId: string) {
