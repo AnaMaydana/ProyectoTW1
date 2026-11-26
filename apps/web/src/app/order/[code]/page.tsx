@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../../../lib/api';
 import { PublicOrder } from '../../../lib/types';
 
@@ -25,6 +26,14 @@ export default function OrderConfirmation({ params }: { params: Promise<{ code: 
       {receipt ? (
         <>
           <p>Código de pedido: <strong>{receipt.code}</strong></p>
+          <div
+            className="order-qr"
+            data-testid="order-qr"
+            role="img"
+            aria-label={`QR del pedido ${receipt.code}`}
+          >
+            <QRCodeSVG value={receipt.code} size={160} level="M" />
+          </div>
           <p>Total: Bs {receipt.totalBs}</p>
           <p>Hora de recojo: {receipt.pickupTime}</p>
           <p>Estado: {receipt.status}</p>
@@ -36,7 +45,14 @@ export default function OrderConfirmation({ params }: { params: Promise<{ code: 
             ))}
           </ul>
           {receipt.comprobante && (
-            <p>Comprobante: <strong>{receipt.comprobante.numero}</strong> — {receipt.comprobante.fechaEmision}</p>
+            <>
+              <p>Comprobante: <strong>{receipt.comprobante.numero}</strong> — {receipt.comprobante.fechaEmision}</p>
+              <p>
+                <a className="button-link" href={`/order/${encodeURIComponent(receipt.code)}/comprobante`}>
+                  Descargar comprobante
+                </a>
+              </p>
+            </>
           )}
           <p>Mostrá el código {receipt.code} en la sucursal.</p>
         </>
